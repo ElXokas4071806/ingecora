@@ -26,7 +26,6 @@ export default function ProyectoPage() {
     const { data: proy } = await supabase
       .from('projects').select('*').eq('id', id).single()
     setProyecto(proy)
-
     const { data: logs } = await supabase
       .from('daily_logs').select('*').eq('project_id', id)
       .order('fecha', { ascending: false })
@@ -72,20 +71,19 @@ export default function ProyectoPage() {
         </div>
       </header>
 
-      <main className="max-w-4xl mx-auto px-4 py-8">
-        {/* Stats */}
-        <div className="grid grid-cols-3 gap-4 mb-8">
-          <div className="bg-white rounded-xl p-4 shadow-sm text-center">
+      <main className="max-w-4xl mx-auto px-4 py-6">
+        <div className="grid grid-cols-3 gap-3 mb-6">
+          <div className="bg-white rounded-xl p-3 shadow-sm text-center">
             <p className="text-2xl font-bold text-green-700">{bitacoras.length}</p>
             <p className="text-xs text-gray-500">Bitácoras</p>
           </div>
-          <div className="bg-white rounded-xl p-4 shadow-sm text-center">
+          <div className="bg-white rounded-xl p-3 shadow-sm text-center">
             <p className="text-2xl font-bold text-blue-600">
               {bitacoras.filter(b => b.estado === 'aprobada').length}
             </p>
             <p className="text-xs text-gray-500">Aprobadas</p>
           </div>
-          <div className="bg-white rounded-xl p-4 shadow-sm text-center">
+          <div className="bg-white rounded-xl p-3 shadow-sm text-center">
             <p className="text-2xl font-bold text-yellow-600">
               {bitacoras.filter(b => b.estado === 'borrador').length}
             </p>
@@ -93,61 +91,56 @@ export default function ProyectoPage() {
           </div>
         </div>
 
-        {/* Botones */}
-        <div className="flex items-center justify-between mb-6">
-          <h2 className="text-lg font-bold text-gray-800">Bitácoras</h2>
-          <div className="flex gap-2">
-            <button
-              onClick={() => router.push(`/dashboard/proyectos/${proyectoId}/informe`)}
-              className="flex items-center gap-2 border border-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-50 transition text-sm"
-            >
-              <FileText size={16} /> Informe PDF
-            </button>
-            <button
-              onClick={() => setMostrarSelector(!mostrarSelector)}
-              className="flex items-center gap-2 border border-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-50 transition text-sm"
-            >
-              <Calendar size={16} /> Otra fecha
-            </button>
-            <button
-              onClick={() => nuevaBitacora(hoy())}
-              className="flex items-center gap-2 bg-green-700 text-white px-4 py-2 rounded-lg hover:bg-green-800 transition text-sm"
-            >
-              <Plus size={18} /> Bitácora de hoy
-            </button>
-          </div>
+        <button
+          onClick={() => nuevaBitacora(hoy())}
+          className="w-full flex items-center justify-center gap-2 bg-green-700 text-white px-4 py-3 rounded-xl hover:bg-green-800 transition font-medium mb-3"
+        >
+          <Plus size={20} /> Bitácora de hoy
+        </button>
+
+        <div className="grid grid-cols-2 gap-3 mb-6">
+          <button
+            onClick={() => setMostrarSelector(!mostrarSelector)}
+            className="flex items-center justify-center gap-2 border border-gray-300 text-gray-700 px-4 py-2.5 rounded-xl hover:bg-gray-50 transition text-sm"
+          >
+            <Calendar size={16} /> Otra fecha
+          </button>
+          <button
+            onClick={() => router.push(`/dashboard/proyectos/${proyectoId}/informe`)}
+            className="flex items-center justify-center gap-2 border border-gray-300 text-gray-700 px-4 py-2.5 rounded-xl hover:bg-gray-50 transition text-sm"
+          >
+            <FileText size={16} /> Informe PDF
+          </button>
         </div>
 
-        {/* Selector de fecha */}
         {mostrarSelector && (
-          <div className="bg-white rounded-xl p-4 shadow-sm mb-4 flex items-center gap-3">
-            <Calendar size={18} className="text-gray-400" />
-            <input
-              type="date"
-              value={fechaSeleccionada}
-              max={hoy()}
-              onChange={(e) => setFechaSeleccionada(e.target.value)}
-              className="border border-gray-300 rounded-lg px-3 py-2 text-gray-800 focus:outline-none focus:ring-2 focus:ring-green-500"
-            />
-            <button
-              onClick={() => {
-                if (fechaSeleccionada) {
-                  nuevaBitacora(fechaSeleccionada)
-                  setMostrarSelector(false)
-                }
-              }}
-              disabled={!fechaSeleccionada}
-              className="bg-green-700 text-white px-4 py-2 rounded-lg hover:bg-green-800 transition text-sm disabled:opacity-50"
-            >
-              Ir a esa fecha
-            </button>
-            <button onClick={() => setMostrarSelector(false)} className="text-gray-400 hover:text-gray-600">
-              <ArrowLeft size={16} />
-            </button>
+          <div className="bg-white rounded-xl p-4 shadow-sm mb-4">
+            <p className="text-sm font-medium text-gray-700 mb-3">Selecciona una fecha:</p>
+            <div className="flex gap-3">
+              <input
+                type="date"
+                value={fechaSeleccionada}
+                max={hoy()}
+                onChange={(e) => setFechaSeleccionada(e.target.value)}
+                className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-gray-800 focus:outline-none focus:ring-2 focus:ring-green-500"
+              />
+              <button
+                onClick={() => {
+                  if (fechaSeleccionada) {
+                    nuevaBitacora(fechaSeleccionada)
+                    setMostrarSelector(false)
+                  }
+                }}
+                disabled={!fechaSeleccionada}
+                className="bg-green-700 text-white px-4 py-2 rounded-lg hover:bg-green-800 transition text-sm disabled:opacity-50"
+              >
+                Ir
+              </button>
+            </div>
           </div>
         )}
 
-        {/* Lista de bitácoras */}
+        <h2 className="text-lg font-bold text-gray-800 mb-3">Bitácoras registradas</h2>
         {bitacoras.length === 0 ? (
           <div className="text-center py-16 text-gray-400">
             <BookOpen size={48} className="mx-auto mb-3 opacity-50" />
