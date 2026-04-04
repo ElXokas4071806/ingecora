@@ -172,24 +172,24 @@ export default function Dashboard() {
                   className="w-full border border-gray-300 rounded-lg px-4 py-2 text-gray-800 focus:outline-none focus:ring-2 focus:ring-green-500"
                   rows={2}
                 />
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="text-xs text-gray-500">Fecha inicio</label>
-                    <input type="date"
-                      value={newProject.fecha_inicio}
-                      onChange={(e) => setNewProject({...newProject, fecha_inicio: e.target.value})}
-                      className="w-full border border-gray-300 rounded-lg px-4 py-2 text-gray-800 focus:outline-none focus:ring-2 focus:ring-green-500"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs text-gray-500">Fecha fin estimada</label>
-                    <input type="date"
-                      value={newProject.fecha_fin_estimada}
-                      onChange={(e) => setNewProject({...newProject, fecha_fin_estimada: e.target.value})}
-                      className="w-full border border-gray-300 rounded-lg px-4 py-2 text-gray-800 focus:outline-none focus:ring-2 focus:ring-green-500"
-                    />
-                  </div>
-                </div>
+                <div className="flex flex-col gap-3">
+  <div>
+    <label className="text-xs text-gray-500 mb-1 block">Fecha inicio (opcional)</label>
+    <input type="date"
+      value={newProject.fecha_inicio}
+      onChange={(e) => setNewProject({...newProject, fecha_inicio: e.target.value})}
+      className="w-full border border-gray-300 rounded-lg px-4 py-2 text-gray-800 focus:outline-none focus:ring-2 focus:ring-green-500"
+    />
+  </div>
+  <div>
+    <label className="text-xs text-gray-500 mb-1 block">Fecha fin estimada (opcional)</label>
+    <input type="date"
+      value={newProject.fecha_fin_estimada}
+      onChange={(e) => setNewProject({...newProject, fecha_fin_estimada: e.target.value})}
+      className="w-full border border-gray-300 rounded-lg px-4 py-2 text-gray-800 focus:outline-none focus:ring-2 focus:ring-green-500"
+    />
+  </div>
+</div>
                 <div className="flex gap-3 pt-2">
                   <button type="button" onClick={() => setShowNewProject(false)}
                     className="flex-1 border border-gray-300 text-gray-700 py-2 rounded-lg hover:bg-gray-50">
