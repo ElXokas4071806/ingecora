@@ -37,11 +37,20 @@ export default function Dashboard() {
 
   const crearProyecto = async (e) => {
     e.preventDefault()
+    const payload = {
+      nombre: newProject.nombre,
+      org_id: profile.org_id,
+    }
+    if (newProject.ubicacion) payload.ubicacion = newProject.ubicacion
+    if (newProject.descripcion) payload.descripcion = newProject.descripcion
+    if (newProject.fecha_inicio) payload.fecha_inicio = newProject.fecha_inicio
+    if (newProject.fecha_fin_estimada) payload.fecha_fin_estimada = newProject.fecha_fin_estimada
+
     const { data: proj, error } = await supabase
       .from('projects')
-      .insert({ ...newProject, org_id: profile.org_id })
+      .insert(payload)
       .select().single()
-    if (!error) {
+    if (!error && proj) {
       setProjects([proj, ...projects])
       setShowNewProject(false)
       setNewProject({ nombre: '', ubicacion: '', descripcion: '', fecha_inicio: '', fecha_fin_estimada: '' })
@@ -49,8 +58,10 @@ export default function Dashboard() {
   }
 
   const borrarProyecto = async (id) => {
-    await supabase.from('projects').delete().eq('id', id)
-    setProjects(projects.filter(p => p.id !== id))
+    const { error } = await supabase.from('projects').delete().eq('id', id)
+    if (!error) {
+      setProjects(prev => prev.filter(p => p.id !== id))
+    }
     setConfirmBorrar(null)
   }
 
@@ -87,12 +98,12 @@ export default function Dashboard() {
               <h3 className="font-bold text-gray-800">Borrar proyecto</h3>
             </div>
             <p className="text-gray-600 text-sm mb-2">
-              Estás a punto de borrar <span className="font-semibold text-gray-800">"{confirmBorrar.nombre}"</span>.
+              Estas a punto de borrar <span className="font-semibold text-gray-800">"{confirmBorrar.nombre}"</span>.
             </p>
             <div className="bg-red-50 border border-red-200 rounded-lg px-4 py-3 mb-5">
               <p className="text-red-700 text-sm font-medium flex items-center gap-2">
                 <AlertTriangle size={14} />
-                Esta acción es irreversible. Se borrarán todas las bitácoras, fotos y actividades asociadas a este proyecto.
+                Esta accion es irreversible. Se borraran todas las bitacoras, fotos y actividades de este proyecto.
               </p>
             </div>
             <div className="flex gap-3">
@@ -106,7 +117,7 @@ export default function Dashboard() {
                 onClick={() => borrarProyecto(confirmBorrar.id)}
                 className="flex-1 bg-red-600 text-white py-2.5 rounded-xl hover:bg-red-700 transition font-medium"
               >
-                Sí, borrar
+                Si, borrar
               </button>
             </div>
           </div>
@@ -160,36 +171,36 @@ export default function Dashboard() {
                   className="w-full border border-gray-300 rounded-lg px-4 py-2 text-gray-800 focus:outline-none focus:ring-2 focus:ring-green-500"
                 />
                 <input
-                  type="text" placeholder="Ubicación"
+                  type="text" placeholder="Ubicacion (opcional)"
                   value={newProject.ubicacion}
                   onChange={(e) => setNewProject({...newProject, ubicacion: e.target.value})}
                   className="w-full border border-gray-300 rounded-lg px-4 py-2 text-gray-800 focus:outline-none focus:ring-2 focus:ring-green-500"
                 />
                 <textarea
-                  placeholder="Descripción"
+                  placeholder="Descripcion (opcional)"
                   value={newProject.descripcion}
                   onChange={(e) => setNewProject({...newProject, descripcion: e.target.value})}
                   className="w-full border border-gray-300 rounded-lg px-4 py-2 text-gray-800 focus:outline-none focus:ring-2 focus:ring-green-500"
                   rows={2}
                 />
                 <div className="flex flex-col gap-3">
-  <div>
-    <label className="text-xs text-gray-500 mb-1 block">Fecha inicio (opcional)</label>
-    <input type="date"
-      value={newProject.fecha_inicio}
-      onChange={(e) => setNewProject({...newProject, fecha_inicio: e.target.value})}
-      className="w-full border border-gray-300 rounded-lg px-4 py-2 text-gray-800 focus:outline-none focus:ring-2 focus:ring-green-500"
-    />
-  </div>
-  <div>
-    <label className="text-xs text-gray-500 mb-1 block">Fecha fin estimada (opcional)</label>
-    <input type="date"
-      value={newProject.fecha_fin_estimada}
-      onChange={(e) => setNewProject({...newProject, fecha_fin_estimada: e.target.value})}
-      className="w-full border border-gray-300 rounded-lg px-4 py-2 text-gray-800 focus:outline-none focus:ring-2 focus:ring-green-500"
-    />
-  </div>
-</div>
+                  <div>
+                    <label className="text-xs text-gray-500 mb-1 block">Fecha inicio (opcional)</label>
+                    <input type="date"
+                      value={newProject.fecha_inicio}
+                      onChange={(e) => setNewProject({...newProject, fecha_inicio: e.target.value})}
+                      className="w-full border border-gray-300 rounded-lg px-2 py-2 text-gray-800 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-500 mb-1 block">Fecha fin estimada (opcional)</label>
+                    <input type="date"
+                      value={newProject.fecha_fin_estimada}
+                      onChange={(e) => setNewProject({...newProject, fecha_fin_estimada: e.target.value})}
+                      className="w-full border border-gray-300 rounded-lg px-2 py-2 text-gray-800 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                    />
+                  </div>
+                </div>
                 <div className="flex gap-3 pt-2">
                   <button type="button" onClick={() => setShowNewProject(false)}
                     className="flex-1 border border-gray-300 text-gray-700 py-2 rounded-lg hover:bg-gray-50">
@@ -215,14 +226,14 @@ export default function Dashboard() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {projects.map((p) => (
-              <div key={p.id} className="bg-white rounded-xl p-5 shadow-sm border border-gray-100 relative group">
+              <div key={p.id} className="bg-white rounded-xl p-5 shadow-sm border border-gray-100 relative">
                 <div
                   onClick={() => router.push(`/dashboard/proyectos/${p.id}`)}
                   className="cursor-pointer"
                 >
                   <div className="flex items-start justify-between mb-2">
-                    <h3 className="font-bold text-gray-800 pr-8">{p.nombre}</h3>
-                    <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full">{p.estado}</span>
+                    <h3 className="font-bold text-gray-800 pr-4">{p.nombre}</h3>
+                    <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full shrink-0">{p.estado}</span>
                   </div>
                   {p.ubicacion && <p className="text-sm text-gray-500 mb-1">📍 {p.ubicacion}</p>}
                   {p.descripcion && <p className="text-sm text-gray-400 line-clamp-2">{p.descripcion}</p>}
@@ -231,12 +242,13 @@ export default function Dashboard() {
                       Inicio: {new Date(p.fecha_inicio).toLocaleDateString('es-CO')}
                     </p>
                   )}
+                  <div className="h-8" />
                 </div>
                 <button
                   onClick={(e) => { e.stopPropagation(); setConfirmBorrar(p) }}
-                  className="absolute bottom-4 right-4 text-red-400 hover:text-red-600 transition p-1.5 rounded-lg hover:bg-red-50 border border-red-200 hover:border-red-400"
+                  className="absolute bottom-4 right-4 flex items-center gap-1 text-red-400 hover:text-red-600 transition px-2 py-1 rounded-lg hover:bg-red-50 border border-red-200 hover:border-red-400 text-xs"
                 >
-                  <Trash2 size={16} />
+                  <Trash2 size={13} /> Borrar
                 </button>
               </div>
             ))}
