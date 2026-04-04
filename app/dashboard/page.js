@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react'
 import { createClient } from '../lib/supabase'
 import { useRouter } from 'next/navigation'
-import { Plus, FolderOpen, LogOut, HardHat } from 'lucide-react'
+import { Plus, FolderOpen, LogOut, HardHat, Trash2, AlertTriangle, X } from 'lucide-react'
 
 export default function Dashboard() {
   const [profile, setProfile] = useState(null)
@@ -10,6 +10,7 @@ export default function Dashboard() {
   const [showNewProject, setShowNewProject] = useState(false)
   const [newProject, setNewProject] = useState({ nombre: '', ubicacion: '', descripcion: '', fecha_inicio: '', fecha_fin_estimada: '' })
   const [loading, setLoading] = useState(true)
+  const [confirmBorrar, setConfirmBorrar] = useState(null)
   const router = useRouter()
   const supabase = createClient()
 
@@ -24,10 +25,7 @@ export default function Dashboard() {
     const { data: prof } = await supabase
       .from('profiles').select('*, organizations(*)').eq('id', user.id).single()
 
-    if (!prof) {
-      setLoading(false)
-      return
-    }
+    if (!prof) { setLoading(false); return }
 
     setProfile(prof)
 
@@ -48,6 +46,12 @@ export default function Dashboard() {
       setShowNewProject(false)
       setNewProject({ nombre: '', ubicacion: '', descripcion: '', fecha_inicio: '', fecha_fin_estimada: '' })
     }
+  }
+
+  const borrarProyecto = async (id) => {
+    await supabase.from('projects').delete().eq('id', id)
+    setProjects(projects.filter(p => p.id !== id))
+    setConfirmBorrar(null)
   }
 
   const cerrarSesion = async () => {
@@ -72,6 +76,43 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      {/* Modal confirmación borrar */}
+      {confirmBorrar && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl p-6 w-full max-w-sm shadow-xl">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="bg-red-100 p-2 rounded-full">
+                <AlertTriangle className="text-red-600" size={22} />
+              </div>
+              <h3 className="font-bold text-gray-800">Borrar proyecto</h3>
+            </div>
+            <p className="text-gray-600 text-sm mb-2">
+              Estás a punto de borrar <span className="font-semibold text-gray-800">"{confirmBorrar.nombre}"</span>.
+            </p>
+            <div className="bg-red-50 border border-red-200 rounded-lg px-4 py-3 mb-5">
+              <p className="text-red-700 text-sm font-medium flex items-center gap-2">
+                <AlertTriangle size={14} />
+                Esta acción es irreversible. Se borrarán todas las bitácoras, fotos y actividades asociadas a este proyecto.
+              </p>
+            </div>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setConfirmBorrar(null)}
+                className="flex-1 border border-gray-300 text-gray-700 py-2.5 rounded-xl hover:bg-gray-50 transition font-medium"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={() => borrarProyecto(confirmBorrar.id)}
+                className="flex-1 bg-red-600 text-white py-2.5 rounded-xl hover:bg-red-700 transition font-medium"
+              >
+                Sí, borrar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <header className="bg-white shadow-sm">
         <div className="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -82,7 +123,7 @@ export default function Dashboard() {
             </div>
           </div>
           <div className="flex items-center gap-4">
-            <span className="text-sm text-gray-600">Hola, {profile?.nombre}</span>
+            <span className="text-sm text-gray-600 hidden sm:block">Hola, {profile?.nombre}</span>
             <button onClick={cerrarSesion} className="flex items-center gap-1 text-gray-500 hover:text-red-500 text-sm">
               <LogOut size={16} /> Salir
             </button>
@@ -101,28 +142,34 @@ export default function Dashboard() {
           </button>
         </div>
 
+        {/* Modal nuevo proyecto */}
         {showNewProject && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
             <div className="bg-white rounded-2xl p-6 w-full max-w-md shadow-xl">
-              <h3 className="text-lg font-bold text-gray-800 mb-4">Nuevo proyecto</h3>
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-bold text-gray-800">Nuevo proyecto</h3>
+                <button onClick={() => setShowNewProject(false)} className="text-gray-400 hover:text-gray-600">
+                  <X size={20} />
+                </button>
+              </div>
               <form onSubmit={crearProyecto} className="space-y-3">
                 <input
                   type="text" placeholder="Nombre del proyecto" required
                   value={newProject.nombre}
                   onChange={(e) => setNewProject({...newProject, nombre: e.target.value})}
-                  className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-green-500 text-gray-800"
+                  className="w-full border border-gray-300 rounded-lg px-4 py-2 text-gray-800 focus:outline-none focus:ring-2 focus:ring-green-500"
                 />
                 <input
                   type="text" placeholder="Ubicación"
                   value={newProject.ubicacion}
                   onChange={(e) => setNewProject({...newProject, ubicacion: e.target.value})}
-                  className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-green-500 text-gray-800"
+                  className="w-full border border-gray-300 rounded-lg px-4 py-2 text-gray-800 focus:outline-none focus:ring-2 focus:ring-green-500"
                 />
                 <textarea
                   placeholder="Descripción"
                   value={newProject.descripcion}
                   onChange={(e) => setNewProject({...newProject, descripcion: e.target.value})}
-                  className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-green-500 text-gray-800"
+                  className="w-full border border-gray-300 rounded-lg px-4 py-2 text-gray-800 focus:outline-none focus:ring-2 focus:ring-green-500"
                   rows={2}
                 />
                 <div className="grid grid-cols-2 gap-3">
@@ -131,7 +178,7 @@ export default function Dashboard() {
                     <input type="date"
                       value={newProject.fecha_inicio}
                       onChange={(e) => setNewProject({...newProject, fecha_inicio: e.target.value})}
-                      className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-green-500 text-gray-800"
+                      className="w-full border border-gray-300 rounded-lg px-4 py-2 text-gray-800 focus:outline-none focus:ring-2 focus:ring-green-500"
                     />
                   </div>
                   <div>
@@ -139,7 +186,7 @@ export default function Dashboard() {
                     <input type="date"
                       value={newProject.fecha_fin_estimada}
                       onChange={(e) => setNewProject({...newProject, fecha_fin_estimada: e.target.value})}
-                      className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-green-500 text-gray-800"
+                      className="w-full border border-gray-300 rounded-lg px-4 py-2 text-gray-800 focus:outline-none focus:ring-2 focus:ring-green-500"
                     />
                   </div>
                 </div>
@@ -158,6 +205,7 @@ export default function Dashboard() {
           </div>
         )}
 
+        {/* Lista de proyectos */}
         {projects.length === 0 ? (
           <div className="text-center py-16 text-gray-400">
             <FolderOpen size={48} className="mx-auto mb-3 opacity-50" />
@@ -167,20 +215,29 @@ export default function Dashboard() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {projects.map((p) => (
-              <div key={p.id}
-                onClick={() => router.push(`/dashboard/proyectos/${p.id}`)}
-                className="bg-white rounded-xl p-5 shadow-sm hover:shadow-md transition cursor-pointer border border-gray-100">
-                <div className="flex items-start justify-between mb-2">
-                  <h3 className="font-bold text-gray-800">{p.nombre}</h3>
-                  <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full">{p.estado}</span>
+              <div key={p.id} className="bg-white rounded-xl p-5 shadow-sm border border-gray-100 relative group">
+                <div
+                  onClick={() => router.push(`/dashboard/proyectos/${p.id}`)}
+                  className="cursor-pointer"
+                >
+                  <div className="flex items-start justify-between mb-2">
+                    <h3 className="font-bold text-gray-800 pr-8">{p.nombre}</h3>
+                    <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full">{p.estado}</span>
+                  </div>
+                  {p.ubicacion && <p className="text-sm text-gray-500 mb-1">📍 {p.ubicacion}</p>}
+                  {p.descripcion && <p className="text-sm text-gray-400 line-clamp-2">{p.descripcion}</p>}
+                  {p.fecha_inicio && (
+                    <p className="text-xs text-gray-400 mt-3">
+                      Inicio: {new Date(p.fecha_inicio).toLocaleDateString('es-CO')}
+                    </p>
+                  )}
                 </div>
-                {p.ubicacion && <p className="text-sm text-gray-500 mb-1">📍 {p.ubicacion}</p>}
-                {p.descripcion && <p className="text-sm text-gray-400 line-clamp-2">{p.descripcion}</p>}
-                {p.fecha_inicio && (
-                  <p className="text-xs text-gray-400 mt-3">
-                    Inicio: {new Date(p.fecha_inicio).toLocaleDateString('es-CO')}
-                  </p>
-                )}
+                <button
+                  onClick={(e) => { e.stopPropagation(); setConfirmBorrar(p) }}
+                  className="absolute top-3 right-3 text-gray-300 hover:text-red-500 transition p-1 rounded-lg hover:bg-red-50"
+                >
+                  <Trash2 size={16} />
+                </button>
               </div>
             ))}
           </div>
