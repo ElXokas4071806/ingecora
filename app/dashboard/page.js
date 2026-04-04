@@ -234,7 +234,7 @@ export default function Dashboard() {
                 </div>
                 <button
                   onClick={(e) => { e.stopPropagation(); setConfirmBorrar(p) }}
-                  className="absolute top-3 right-3 text-gray-300 hover:text-red-500 transition p-1 rounded-lg hover:bg-red-50"
+                  className="absolute bottom-4 right-4 text-red-400 hover:text-red-600 transition p-1.5 rounded-lg hover:bg-red-50 border border-red-200 hover:border-red-400"
                 >
                   <Trash2 size={16} />
                 </button>
