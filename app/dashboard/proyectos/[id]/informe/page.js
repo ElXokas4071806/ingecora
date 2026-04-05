@@ -271,7 +271,7 @@ export default function InformePage() {
       </header>
 
       <main className="max-w-3xl mx-auto px-4 py-8">
-        <div className="bg-white rounded-xl p-6 shadow-sm">
+        <div className="bg-white rounded-xl p-5 shadow-sm max-w-sm mx-auto">
           <div className="flex items-center gap-3 mb-6">
             <FileText className="text-green-700" size={24} />
             <div>
@@ -285,14 +285,14 @@ export default function InformePage() {
               <label className="block text-sm font-medium text-gray-700 mb-1">Fecha inicio</label>
               <input type="date" value={fechaInicio}
                 onChange={(e) => setFechaInicio(e.target.value)}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-gray-800 focus:outline-none focus:ring-2 focus:ring-green-500"
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-gray-800 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
               />
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Fecha fin</label>
               <input type="date" value={fechaFin}
                 onChange={(e) => setFechaFin(e.target.value)}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-gray-800 focus:outline-none focus:ring-2 focus:ring-green-500"
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-gray-800 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
               />
             </div>
           </div>
