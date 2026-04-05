@@ -4,6 +4,26 @@ import { createClient } from '../../../../../lib/supabase'
 import { useRouter, usePathname } from 'next/navigation'
 import { ArrowLeft, Plus, Trash2, Save, Send, Pencil, Check, X, Camera, Image } from 'lucide-react'
 
+function TooltipActividades() {
+  const [visible, setVisible] = useState(false)
+  return (
+    <div className="relative">
+      <button
+        onClick={() => setVisible(!visible)}
+        className="w-5 h-5 rounded-full bg-gray-200 text-gray-500 flex items-center justify-center text-xs font-bold"
+      >
+        ?
+      </button>
+      {visible && (
+        <div className="absolute left-6 top-0 w-64 bg-gray-800 text-white text-xs rounded-lg px-3 py-2 z-10 shadow-lg">
+          Digite la información relacionada a la actividad y de clic en "Agregar actividad"
+          <button onClick={() => setVisible(false)} className="ml-2 text-gray-400 hover:text-white">✕</button>
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function BitacoraPage() {
   const [log, setLog] = useState(null)
   const [actividades, setActividades] = useState([])
@@ -125,28 +145,19 @@ export default function BitacoraPage() {
     const archivo = e.target.files[0]
     if (!archivo) return
     setSubiendoFoto(true)
-
     const logActual = await obtenerOCrearLog(proyectoId, fecha)
     if (!logActual) { setSubiendoFoto(false); return }
-
     const extension = archivo.name.split('.').pop()
     const nombreArchivo = `${logActual.id}/${Date.now()}.${extension}`
-
     const { error: uploadError } = await supabase.storage
-      .from('fotos-bitacora')
-      .upload(nombreArchivo, archivo)
-
+      .from('fotos-bitacora').upload(nombreArchivo, archivo)
     if (uploadError) { setSubiendoFoto(false); return }
-
     const { data: urlData } = supabase.storage
-      .from('fotos-bitacora')
-      .getPublicUrl(nombreArchivo)
-
+      .from('fotos-bitacora').getPublicUrl(nombreArchivo)
     const { data: foto } = await supabase
       .from('log_fotos')
       .insert({ log_id: logActual.id, url: urlData.publicUrl })
       .select().single()
-
     if (foto) setFotos([...fotos, foto])
     setSubiendoFoto(false)
   }
@@ -192,7 +203,7 @@ export default function BitacoraPage() {
         </div>
       )}
 
-      <header className="bg-white shadow-sm">
+      <header className="bg-white shadow-[0_2px_4px_rgba(0,0,0,0.08)]">
         <div className="max-w-3xl mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <button onClick={() => router.push(`/dashboard/proyectos/${proyectoId}`)} className="text-gray-500 hover:text-gray-800">
@@ -219,8 +230,8 @@ export default function BitacoraPage() {
             {confirmBorrar && (
               <div className="flex items-center gap-2">
                 <span className="text-xs text-red-600">¿Confirmar?</span>
-                <button onClick={borrarBitacora} className="text-xs bg-red-500 text-white px-2 py-1 rounded hover:bg-red-600">Sí, borrar</button>
-                <button onClick={() => setConfirmBorrar(false)} className="text-xs text-gray-500 px-2 py-1 rounded border hover:bg-gray-50">Cancelar</button>
+                <button onClick={borrarBitacora} className="text-xs bg-red-500 text-white px-2 py-1 rounded hover:bg-red-600">Sí</button>
+                <button onClick={() => setConfirmBorrar(false)} className="text-xs text-gray-500 px-2 py-1 rounded border hover:bg-gray-50">No</button>
               </div>
             )}
           </div>
@@ -231,7 +242,7 @@ export default function BitacoraPage() {
         {/* Condiciones */}
         <div className="bg-white rounded-xl p-5 shadow-sm">
           <h2 className="font-bold text-gray-800 mb-4">Condiciones del día</h2>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm text-gray-600 mb-1">Clima</label>
               <select value={clima} onChange={(e) => setClima(e.target.value)}
@@ -256,21 +267,16 @@ export default function BitacoraPage() {
         {/* Actividades */}
         <div className="bg-white rounded-xl p-5 shadow-sm">
           <div className="flex items-center gap-2 mb-4">
-  <h2 className="font-bold text-gray-800">Actividades realizadas</h2>
-  <div className="relative group">
-    <div className="w-5 h-5 rounded-full bg-gray-200 text-gray-500 flex items-center justify-center text-xs font-bold cursor-help">?</div>
-    <div className="absolute left-6 top-0 w-64 bg-gray-800 text-white text-xs rounded-lg px-3 py-2 hidden group-hover:block z-10 shadow-lg">
-      Digite la información relacionada a la actividad y de clic en "Agregar actividad"
-    </div>
-  </div>
-</div>
+            <h2 className="font-bold text-gray-800">Actividades realizadas</h2>
+            <TooltipActividades />
+          </div>
           {actividades.length > 0 && (
             <div className="space-y-3 mb-4">
               {actividades.map((a) => (
                 <div key={a.id} className="border border-gray-100 rounded-lg p-3 bg-gray-50">
                   {editandoId === a.id ? (
                     <div className="space-y-2">
-                      <div className="grid grid-cols-2 gap-2">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                         <input type="text" placeholder="Capítulo"
                           value={editandoData.capitulo}
                           onChange={(e) => setEditandoData({...editandoData, capitulo: e.target.value})}
@@ -324,7 +330,7 @@ export default function BitacoraPage() {
             </div>
           )}
           <div className="border border-dashed border-gray-300 rounded-lg p-4 space-y-3">
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <input type="text" placeholder="Capítulo (ej: Estructura)"
                 value={nuevaActividad.capitulo}
                 onChange={(e) => setNuevaActividad({...nuevaActividad, capitulo: e.target.value})}
@@ -356,10 +362,9 @@ export default function BitacoraPage() {
             <label className={`flex items-center gap-2 bg-green-700 text-white px-4 py-2 rounded-lg text-sm cursor-pointer hover:bg-green-800 transition ${subiendoFoto ? 'opacity-50 cursor-not-allowed' : ''}`}>
               <Camera size={16} />
               {subiendoFoto ? 'Subiendo...' : 'Agregar foto'}
-              <input type="file" accept="image/*"  onChange={subirFoto} className="hidden" disabled={subiendoFoto} />
+              <input type="file" accept="image/*" onChange={subirFoto} className="hidden" disabled={subiendoFoto} />
             </label>
           </div>
-
           {fotos.length === 0 ? (
             <div className="text-center py-8 text-gray-400">
               <Image size={36} className="mx-auto mb-2 opacity-40" />
@@ -391,7 +396,7 @@ export default function BitacoraPage() {
         </div>
 
         {/* Botones */}
-        <div className="flex gap-3 pb-8">
+        <div className="flex flex-col sm:flex-row gap-3 pb-8">
           <button onClick={() => guardarBitacora('borrador')} disabled={guardando}
             className="flex-1 flex items-center justify-center gap-2 border border-gray-300 text-gray-700 py-3 rounded-xl hover:bg-gray-50 transition disabled:opacity-50">
             <Save size={18} /> Guardar borrador
