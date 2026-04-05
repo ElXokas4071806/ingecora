@@ -298,7 +298,7 @@ const subirFoto = async (e) => {
                           onChange={(e) => setEditandoData({...editandoData, capitulo: e.target.value})}
                           className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-green-500"
                         />
-                        <input type="text" placeholder="Partida"
+                        <input type="text" placeholder="Item"
                           value={editandoData.partida}
                           onChange={(e) => setEditandoData({...editandoData, partida: e.target.value})}
                           className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-green-500"
@@ -352,7 +352,7 @@ const subirFoto = async (e) => {
                 onChange={(e) => setNuevaActividad({...nuevaActividad, capitulo: e.target.value})}
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-green-500"
               />
-              <input type="text" placeholder="Partida (ej: Columnas)"
+              <input type="text" placeholder="Item (ej: Columnas)"
                 value={nuevaActividad.partida}
                 onChange={(e) => setNuevaActividad({...nuevaActividad, partida: e.target.value})}
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-green-500"
