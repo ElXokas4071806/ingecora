@@ -249,18 +249,7 @@ const subirFoto = async (e) => {
                 'bg-yellow-100 text-yellow-700'
               }`}>{log.estado}</span>
             )}
-            {log && !confirmBorrar && (
-              <button onClick={() => setConfirmBorrar(true)} className="text-xs text-red-400 hover:text-red-600 px-2 py-1 rounded border border-red-200 hover:border-red-400 transition">
-                Borrar
-              </button>
-            )}
-            {confirmBorrar && (
-              <div className="flex items-center gap-2">
-                <span className="text-xs text-red-600">¿Confirmar?</span>
-                <button onClick={borrarBitacora} className="text-xs bg-red-500 text-white px-2 py-1 rounded hover:bg-red-600">Sí</button>
-                <button onClick={() => setConfirmBorrar(false)} className="text-xs text-gray-500 px-2 py-1 rounded border hover:bg-gray-50">No</button>
-              </div>
-            )}
+            
           </div>
         </div>
       </header>
