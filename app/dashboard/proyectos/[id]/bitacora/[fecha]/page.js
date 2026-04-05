@@ -15,9 +15,13 @@ function TooltipActividades() {
         ?
       </button>
       {visible && (
-        <div className="absolute left-0 top-7 w-64 bg-gray-800 text-white text-xs rounded-lg px-3 py-2 z-10 shadow-lg">
-          Digite la información relacionada a la actividad y de clic en "Agregar actividad"
-          <button onClick={() => setVisible(false)} className="ml-2 text-gray-400 hover:text-white">✕</button>
+        <div className="fixed inset-0 z-20" onClick={() => setVisible(false)}>
+          <div className="absolute bg-gray-800 text-white text-xs rounded-lg px-3 py-2 z-30 shadow-lg w-56"
+            style={{ top: '50%', left: '50%', transform: 'translate(-50%, -50%)' }}
+            onClick={e => e.stopPropagation()}>
+            Digite la información relacionada a la actividad y de clic en "Agregar actividad"
+            <button onClick={() => setVisible(false)} className="block mt-2 text-gray-400 hover:text-white">Cerrar ✕</button>
+          </div>
         </div>
       )}
     </div>
