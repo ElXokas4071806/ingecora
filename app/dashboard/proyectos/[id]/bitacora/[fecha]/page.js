@@ -17,7 +17,7 @@ function TooltipActividades() {
       {visible && (
         <>
           <div className="fixed inset-0 z-10" onClick={() => setVisible(false)} />
-          <div className="absolute left-0 top-7 w-56 bg-gray-800 text-white text-xs rounded-lg px-3 py-2 z-20 shadow-lg"
+          <div className="absolute right-0 top-7 w-56 bg-gray-800 text-white text-xs rounded-lg px-3 py-2 z-20 shadow-lg"
             style={{ maxWidth: 'calc(100vw - 2rem)' }}>
             Digite la información relacionada a la actividad y de clic en "Agregar actividad"
             <button onClick={() => setVisible(false)} className="block mt-2 text-gray-400 hover:text-white">Cerrar ✕</button>
