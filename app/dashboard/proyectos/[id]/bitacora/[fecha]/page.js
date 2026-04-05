@@ -145,23 +145,46 @@ export default function BitacoraPage() {
     router.push(`/dashboard/proyectos/${proyectoId}`)
   }
 
-  const subirFoto = async (e) => {
+const subirFoto = async (e) => {
     const archivo = e.target.files[0]
     if (!archivo) return
     setSubiendoFoto(true)
+
     const logActual = await obtenerOCrearLog(proyectoId, fecha)
     if (!logActual) { setSubiendoFoto(false); return }
-    const extension = archivo.name.split('.').pop()
+
+    let archivoFinal = archivo
+    const esHEIF = archivo.type === 'image/heic' || archivo.type === 'image/heif' ||
+      archivo.name.toLowerCase().endsWith('.heic') || archivo.name.toLowerCase().endsWith('.heif')
+
+    if (esHEIF) {
+      try {
+        const heic2any = (await import('heic2any')).default
+        const blob = await heic2any({ blob: archivo, toType: 'image/jpeg', quality: 0.8 })
+        archivoFinal = new File([blob], archivo.name.replace(/\.(heic|heif)$/i, '.jpg'), { type: 'image/jpeg' })
+      } catch (err) {
+        console.error('Error convirtiendo HEIF:', err)
+        setSubiendoFoto(false)
+        return
+      }
+    }
+
+    const extension = archivoFinal.name.split('.').pop()
     const nombreArchivo = `${logActual.id}/${Date.now()}.${extension}`
+
     const { error: uploadError } = await supabase.storage
-      .from('fotos-bitacora').upload(nombreArchivo, archivo)
+      .from('fotos-bitacora').upload(nombreArchivo, archivoFinal)
+
     if (uploadError) { setSubiendoFoto(false); return }
+
     const { data: urlData } = supabase.storage
       .from('fotos-bitacora').getPublicUrl(nombreArchivo)
+
     const { data: foto } = await supabase
       .from('log_fotos')
       .insert({ log_id: logActual.id, url: urlData.publicUrl })
       .select().single()
+
     if (foto) setFotos([...fotos, foto])
     setSubiendoFoto(false)
   }
