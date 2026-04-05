@@ -348,7 +348,7 @@ export default function BitacoraPage() {
             <label className={`flex items-center gap-2 bg-green-700 text-white px-4 py-2 rounded-lg text-sm cursor-pointer hover:bg-green-800 transition ${subiendoFoto ? 'opacity-50 cursor-not-allowed' : ''}`}>
               <Camera size={16} />
               {subiendoFoto ? 'Subiendo...' : 'Agregar foto'}
-              <input type="file" accept="image/*" capture="environment" onChange={subirFoto} className="hidden" disabled={subiendoFoto} />
+              <input type="file" accept="image/*"  onChange={subirFoto} className="hidden" disabled={subiendoFoto} />
             </label>
           </div>
 
