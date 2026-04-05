@@ -280,7 +280,7 @@ export default function InformePage() {
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4 mb-6">
+          <div className="flex flex-col gap-4 mb-6">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Fecha inicio</label>
               <input type="date" value={fechaInicio}
