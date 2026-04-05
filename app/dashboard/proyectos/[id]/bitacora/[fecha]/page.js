@@ -15,7 +15,7 @@ function TooltipActividades() {
         ?
       </button>
       {visible && (
-        <div className="absolute left-6 top-0 w-64 bg-gray-800 text-white text-xs rounded-lg px-3 py-2 z-10 shadow-lg">
+        <div className="absolute left-0 top-7 w-64 bg-gray-800 text-white text-xs rounded-lg px-3 py-2 z-10 shadow-lg">
           Digite la información relacionada a la actividad y de clic en "Agregar actividad"
           <button onClick={() => setVisible(false)} className="ml-2 text-gray-400 hover:text-white">✕</button>
         </div>
