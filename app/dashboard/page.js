@@ -242,7 +242,7 @@ export default function Dashboard() {
         </div>
       )}
 
-      <header className="bg-white shadow-sm">
+      <header className="bg-white shadow-[0_2px_4px_rgba(0,0,0,0.08)]">
         <div className="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <HardHat className="text-green-700" size={28} />
