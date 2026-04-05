@@ -270,8 +270,8 @@ export default function InformePage() {
         </div>
       </header>
 
-      <main className="max-w-sm mx-auto px-4 py-8">
-        <div className="bg-white rounded-xl p-5 shadow-sm max-w-sm mx-auto">
+      <main className="max-w-xs mx-auto px-4 py-8">
+        <div className="bg-white rounded-xl p-5 shadow-sm max-w-xs mx-auto">
           <div className="flex items-center gap-3 mb-6">
             <FileText className="text-green-700" size={24} />
             <div>
