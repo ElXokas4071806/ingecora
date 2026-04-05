@@ -7,7 +7,7 @@ import { ArrowLeft, Plus, Trash2, Save, Send, Pencil, Check, X, Camera, Image } 
 function TooltipActividades() {
   const [visible, setVisible] = useState(false)
   return (
-    <div className="relative">
+    <div className="relative inline-block">
       <button
         onClick={() => setVisible(!visible)}
         className="w-5 h-5 rounded-full bg-gray-200 text-gray-500 flex items-center justify-center text-xs font-bold"
@@ -15,14 +15,14 @@ function TooltipActividades() {
         ?
       </button>
       {visible && (
-        <div className="fixed inset-0 z-20" onClick={() => setVisible(false)}>
-          <div className="absolute bg-gray-800 text-white text-xs rounded-lg px-3 py-2 z-30 shadow-lg w-56"
-            style={{ top: '50%', left: '50%', transform: 'translate(-50%, -50%)' }}
-            onClick={e => e.stopPropagation()}>
+        <>
+          <div className="fixed inset-0 z-10" onClick={() => setVisible(false)} />
+          <div className="absolute left-0 top-7 w-56 bg-gray-800 text-white text-xs rounded-lg px-3 py-2 z-20 shadow-lg"
+            style={{ maxWidth: 'calc(100vw - 2rem)' }}>
             Digite la información relacionada a la actividad y de clic en "Agregar actividad"
             <button onClick={() => setVisible(false)} className="block mt-2 text-gray-400 hover:text-white">Cerrar ✕</button>
           </div>
-        </div>
+        </>
       )}
     </div>
   )
