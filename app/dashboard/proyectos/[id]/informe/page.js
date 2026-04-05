@@ -284,9 +284,9 @@ export default function InformePage() {
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Fecha inicio</label>
               <input type="date" value={fechaInicio}
-                onChange={(e) => setFechaInicio(e.target.value)}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-gray-800 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
-              />
+  onChange={(e) => setFechaInicio(e.target.value)}
+  className="w-full min-w-0 border border-gray-300 rounded-lg px-2 py-2 text-gray-800 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 box-border"
+/>
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Fecha fin</label>
