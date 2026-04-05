@@ -33,7 +33,7 @@ export default function Dashboard() {
 
   const crearProyecto = async (e) => {
     e.preventDefault()
-    const payload = { nombre: newProject.nombre, org_id: profile.org_id }
+    const payload = { nombre: newProject.nombre, org_id: profile.org_id, estado: 'activo' }
     if (newProject.ubicacion) payload.ubicacion = newProject.ubicacion
     if (newProject.descripcion) payload.descripcion = newProject.descripcion
     if (newProject.fecha_inicio) payload.fecha_inicio = newProject.fecha_inicio
@@ -50,6 +50,7 @@ export default function Dashboard() {
     setEditando(p.id)
     setEditData({
       nombre: p.nombre || '',
+      estado: p.estado || 'activo',
       ubicacion: p.ubicacion || '',
       descripcion: p.descripcion || '',
       fecha_inicio: p.fecha_inicio || '',
@@ -58,15 +59,14 @@ export default function Dashboard() {
   }
 
   const guardarEdicion = async (id) => {
-    const payload = { nombre: editData.nombre }
-    if (editData.ubicacion) payload.ubicacion = editData.ubicacion
-    else payload.ubicacion = null
-    if (editData.descripcion) payload.descripcion = editData.descripcion
-    else payload.descripcion = null
-    if (editData.fecha_inicio) payload.fecha_inicio = editData.fecha_inicio
-    else payload.fecha_inicio = null
-    if (editData.fecha_fin_estimada) payload.fecha_fin_estimada = editData.fecha_fin_estimada
-    else payload.fecha_fin_estimada = null
+    const payload = {
+      nombre: editData.nombre,
+      estado: editData.estado || 'activo',
+    }
+    payload.ubicacion = editData.ubicacion || null
+    payload.descripcion = editData.descripcion || null
+    payload.fecha_inicio = editData.fecha_inicio || null
+    payload.fecha_fin_estimada = editData.fecha_fin_estimada || null
 
     const { error } = await supabase.from('projects').update(payload).eq('id', id)
     if (!error) {
@@ -86,6 +86,15 @@ export default function Dashboard() {
     router.push('/login')
   }
 
+  const estadoBadge = (estado) => {
+    switch(estado) {
+      case 'en pausa': return 'bg-yellow-100 text-yellow-700'
+      case 'terminado': return 'bg-blue-100 text-blue-700'
+      case 'cancelado': return 'bg-red-100 text-red-700'
+      default: return 'bg-green-100 text-green-700'
+    }
+  }
+
   if (loading) return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center">
       <p className="text-gray-500">Cargando...</p>
@@ -103,7 +112,8 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Modal confirmación borrar */}
+
+      {/* Modal confirmación borrar proyecto */}
       {confirmBorrar && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl p-6 w-full max-w-sm shadow-xl">
@@ -119,7 +129,7 @@ export default function Dashboard() {
             <div className="bg-red-50 border border-red-200 rounded-lg px-4 py-3 mb-5">
               <p className="text-red-700 text-sm font-medium flex items-center gap-2">
                 <AlertTriangle size={14} />
-                Esta accion es irreversible. Se borraran todas las bitacoras, fotos y actividades de este proyecto.
+                Esta acción es irreversible. Todos los datos, bitácoras, fotos y actividades se perderán para siempre y no podrán recuperarse.
               </p>
             </div>
             <div className="flex gap-3">
@@ -129,7 +139,7 @@ export default function Dashboard() {
               </button>
               <button onClick={() => borrarProyecto(confirmBorrar.id)}
                 className="flex-1 bg-red-600 text-white py-2.5 rounded-xl hover:bg-red-700 transition font-medium">
-                Si, borrar
+                Sí, borrar
               </button>
             </div>
           </div>
@@ -154,6 +164,19 @@ export default function Dashboard() {
                   onChange={(e) => setEditData({...editData, nombre: e.target.value})}
                   className="w-full border border-gray-300 rounded-lg px-4 py-2 text-gray-800 focus:outline-none focus:ring-2 focus:ring-green-500"
                 />
+              </div>
+              <div>
+                <label className="text-xs text-gray-500 mb-1 block">Estado del proyecto</label>
+                <select
+                  value={editData.estado || 'activo'}
+                  onChange={(e) => setEditData({...editData, estado: e.target.value})}
+                  className="w-full border border-gray-300 rounded-lg px-4 py-2 text-gray-800 focus:outline-none focus:ring-2 focus:ring-green-500"
+                >
+                  <option value="activo">Activo</option>
+                  <option value="en pausa">En pausa</option>
+                  <option value="terminado">Terminado</option>
+                  <option value="cancelado">Cancelado</option>
+                </select>
               </div>
               <div>
                 <label className="text-xs text-gray-500 mb-1 block">Ubicacion</label>
@@ -322,7 +345,9 @@ export default function Dashboard() {
                 <div onClick={() => router.push(`/dashboard/proyectos/${p.id}`)} className="cursor-pointer">
                   <div className="flex items-start justify-between mb-2">
                     <h3 className="font-bold text-gray-800 pr-4">{p.nombre}</h3>
-                    <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full shrink-0">{p.estado}</span>
+                    <span className={`text-xs px-2 py-1 rounded-full shrink-0 font-medium capitalize ${estadoBadge(p.estado)}`}>
+                      {p.estado}
+                    </span>
                   </div>
                   {p.ubicacion && <p className="text-sm text-gray-500 mb-1">📍 {p.ubicacion}</p>}
                   {p.descripcion && <p className="text-sm text-gray-400 line-clamp-2">{p.descripcion}</p>}
