@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react'
 import { createClient } from '../../../lib/supabase'
 import { useRouter, usePathname } from 'next/navigation'
-import { ArrowLeft, Plus, BookOpen, CheckCircle, Clock, Calendar, FileText } from 'lucide-react'
+import { ArrowLeft, Plus, BookOpen, CheckCircle, Clock, Calendar, FileText, Trash2, AlertTriangle } from 'lucide-react'
 
 export default function ProyectoPage() {
   const [proyecto, setProyecto] = useState(null)
@@ -11,6 +11,7 @@ export default function ProyectoPage() {
   const [proyectoId, setProyectoId] = useState(null)
   const [mostrarSelector, setMostrarSelector] = useState(false)
   const [fechaSeleccionada, setFechaSeleccionada] = useState('')
+  const [confirmBorrarBitacora, setConfirmBorrarBitacora] = useState(null)
   const router = useRouter()
   const pathname = usePathname()
   const supabase = createClient()
@@ -37,6 +38,12 @@ export default function ProyectoPage() {
     router.push(`/dashboard/proyectos/${proyectoId}/bitacora/${fecha}`)
   }
 
+  const borrarBitacora = async (id) => {
+    await supabase.from('daily_logs').delete().eq('id', id)
+    setBitacoras(prev => prev.filter(b => b.id !== id))
+    setConfirmBorrarBitacora(null)
+  }
+
   const hoy = () => new Date().toISOString().split('T')[0]
 
   const estadoColor = (estado) => {
@@ -59,6 +66,45 @@ export default function ProyectoPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
+
+      {/* Modal confirmación borrar bitácora */}
+      {confirmBorrarBitacora && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl p-6 w-full max-w-sm shadow-xl">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="bg-red-100 p-2 rounded-full">
+                <AlertTriangle className="text-red-600" size={22} />
+              </div>
+              <h3 className="font-bold text-gray-800">Borrar bitácora</h3>
+            </div>
+            <p className="text-gray-600 text-sm mb-2">
+              Estas a punto de borrar la bitácora del{' '}
+              <span className="font-semibold text-gray-800">
+                {new Date(confirmBorrarBitacora.fecha + 'T12:00:00').toLocaleDateString('es-CO', {
+                  weekday: 'long', day: 'numeric', month: 'long', year: 'numeric'
+                })}
+              </span>.
+            </p>
+            <div className="bg-red-50 border border-red-200 rounded-lg px-4 py-3 mb-5">
+              <p className="text-red-700 text-sm font-medium flex items-center gap-2">
+                <AlertTriangle size={14} />
+                Esta acción es irreversible. Todos los datos, actividades y fotos de esta bitácora se perderán para siempre y no podrán recuperarse.
+              </p>
+            </div>
+            <div className="flex gap-3">
+              <button onClick={() => setConfirmBorrarBitacora(null)}
+                className="flex-1 border border-gray-300 text-gray-700 py-2.5 rounded-xl hover:bg-gray-50 transition font-medium">
+                Cancelar
+              </button>
+              <button onClick={() => borrarBitacora(confirmBorrarBitacora.id)}
+                className="flex-1 bg-red-600 text-white py-2.5 rounded-xl hover:bg-red-700 transition font-medium">
+                Sí, borrar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <header className="bg-white shadow-sm">
         <div className="max-w-4xl mx-auto px-4 py-4 flex items-center gap-3">
           <button onClick={() => router.push('/dashboard')} className="text-gray-500 hover:text-gray-800">
@@ -151,9 +197,11 @@ export default function ProyectoPage() {
           <div className="space-y-3">
             {bitacoras.map((b) => (
               <div key={b.id}
-                onClick={() => router.push(`/dashboard/proyectos/${proyectoId}/bitacora/${b.fecha}`)}
-                className="bg-white rounded-xl p-4 shadow-sm hover:shadow-md transition cursor-pointer border border-gray-100 flex items-center justify-between">
-                <div>
+                className="bg-white rounded-xl p-4 shadow-sm border border-gray-100 flex items-center justify-between">
+                <div
+                  onClick={() => router.push(`/dashboard/proyectos/${proyectoId}/bitacora/${b.fecha}`)}
+                  className="flex-1 cursor-pointer hover:opacity-80 transition"
+                >
                   <p className="font-medium text-gray-800">
                     {new Date(b.fecha + 'T12:00:00').toLocaleDateString('es-CO', {
                       weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
@@ -161,9 +209,17 @@ export default function ProyectoPage() {
                   </p>
                   {b.clima && <p className="text-sm text-gray-500 mt-1">🌤 {b.clima} · 👷 {b.personal_en_sitio} personas</p>}
                 </div>
-                <div className={`flex items-center gap-1 text-xs px-2 py-1 rounded-full font-medium ${estadoColor(b.estado)}`}>
-                  {estadoIcono(b.estado)}
-                  <span className="capitalize">{b.estado}</span>
+                <div className="flex items-center gap-2 ml-2">
+                  <div className={`flex items-center gap-1 text-xs px-2 py-1 rounded-full font-medium ${estadoColor(b.estado)}`}>
+                    {estadoIcono(b.estado)}
+                    <span className="capitalize hidden sm:block">{b.estado}</span>
+                  </div>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); setConfirmBorrarBitacora(b) }}
+                    className="text-red-400 hover:text-red-600 p-1.5 rounded-lg hover:bg-red-50 transition border border-red-200 hover:border-red-400"
+                  >
+                    <Trash2 size={15} />
+                  </button>
                 </div>
               </div>
             ))}
