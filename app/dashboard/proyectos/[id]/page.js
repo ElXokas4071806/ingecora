@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react'
 import { createClient } from '../../../lib/supabase'
 import { useRouter, usePathname } from 'next/navigation'
-import { ArrowLeft, Plus, BookOpen, CheckCircle, Clock, Calendar, FileText, Trash2, AlertTriangle } from 'lucide-react'
+import { ArrowLeft, Plus, BookOpen, CheckCircle, Clock, Calendar, FileText, Trash2, AlertTriangle, Users } from 'lucide-react'
 
 export default function ProyectoPage() {
   const [proyecto, setProyecto] = useState(null)
@@ -105,7 +105,7 @@ export default function ProyectoPage() {
         </div>
       )}
 
-      <header className="bg-white shadow-sm">
+      <header className="bg-white shadow-[0_2px_4px_rgba(0,0,0,0.08)]">
         <div className="max-w-4xl mx-auto px-4 py-4 flex items-center gap-3">
           <button onClick={() => router.push('/dashboard')} className="text-gray-500 hover:text-gray-800">
             <ArrowLeft size={20} />
@@ -144,7 +144,7 @@ export default function ProyectoPage() {
           <Plus size={20} /> Bitácora de hoy
         </button>
 
-        <div className="grid grid-cols-2 gap-3 mb-6">
+        <div className="grid grid-cols-3 gap-3 mb-6">
           <button
             onClick={() => setMostrarSelector(!mostrarSelector)}
             className="flex items-center justify-center gap-2 border border-gray-300 text-gray-700 px-4 py-2.5 rounded-xl hover:bg-gray-50 transition text-sm"
@@ -156,6 +156,12 @@ export default function ProyectoPage() {
             className="flex items-center justify-center gap-2 border border-gray-300 text-gray-700 px-4 py-2.5 rounded-xl hover:bg-gray-50 transition text-sm"
           >
             <FileText size={16} /> Informe PDF
+          </button>
+          <button
+            onClick={() => router.push(`/dashboard/proyectos/${proyectoId}/miembros`)}
+            className="flex items-center justify-center gap-2 border border-gray-300 text-gray-700 px-4 py-2.5 rounded-xl hover:bg-gray-50 transition text-sm"
+          >
+            <Users size={16} /> Miembros
           </button>
         </div>
 
