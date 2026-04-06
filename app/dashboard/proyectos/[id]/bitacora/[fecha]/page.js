@@ -2,16 +2,14 @@
 import { useState, useEffect } from 'react'
 import { createClient } from '../../../../../lib/supabase'
 import { useRouter, usePathname } from 'next/navigation'
-import { ArrowLeft, Plus, Trash2, Save, Send, Pencil, Check, X, Camera, Image } from 'lucide-react'
+import { ArrowLeft, Plus, Trash2, Save, Send, Pencil, Check, X, Camera, Image, Eye } from 'lucide-react'
 
 function TooltipActividades() {
   const [visible, setVisible] = useState(false)
   return (
     <div className="relative inline-block">
-      <button
-        onClick={() => setVisible(!visible)}
-        className="w-5 h-5 rounded-full bg-gray-200 text-gray-500 flex items-center justify-center text-xs font-bold"
-      >
+      <button onClick={() => setVisible(!visible)}
+        className="w-5 h-5 rounded-full bg-gray-200 text-gray-500 flex items-center justify-center text-xs font-bold">
         ?
       </button>
       {visible && (
@@ -43,8 +41,8 @@ export default function BitacoraPage() {
   const [subiendoFoto, setSubiendoFoto] = useState(false)
   const [proyectoId, setProyectoId] = useState(null)
   const [fecha, setFecha] = useState(null)
-  const [confirmBorrar, setConfirmBorrar] = useState(false)
   const [fotoSeleccionada, setFotoSeleccionada] = useState(null)
+  const [rolUsuario, setRolUsuario] = useState(null)
   const router = useRouter()
   const pathname = usePathname()
   const supabase = createClient()
@@ -59,6 +57,17 @@ export default function BitacoraPage() {
   }, [pathname])
 
   const loadData = async (id, f) => {
+    const { data: { user } } = await supabase.auth.getUser()
+
+    // Determinar rol
+    const { data: membresia } = await supabase
+      .from('project_members')
+      .select('rol')
+      .eq('project_id', id)
+      .eq('user_id', user.id)
+      .single()
+    setRolUsuario(membresia?.rol || 'cliente')
+
     const { data: existingLog } = await supabase
       .from('daily_logs').select('*')
       .eq('project_id', id).eq('fecha', f).maybeSingle()
@@ -138,18 +147,10 @@ export default function BitacoraPage() {
     setEditandoId(null)
   }
 
-  const cancelarEdicion = () => setEditandoId(null)
-
-  const borrarBitacora = async () => {
-    await supabase.from('daily_logs').delete().eq('id', log.id)
-    router.push(`/dashboard/proyectos/${proyectoId}`)
-  }
-
-const subirFoto = async (e) => {
+  const subirFoto = async (e) => {
     const archivo = e.target.files[0]
     if (!archivo) return
     setSubiendoFoto(true)
-
     const logActual = await obtenerOCrearLog(proyectoId, fecha)
     if (!logActual) { setSubiendoFoto(false); return }
 
@@ -163,28 +164,18 @@ const subirFoto = async (e) => {
         const blob = await heic2any({ blob: archivo, toType: 'image/jpeg', quality: 0.8 })
         archivoFinal = new File([blob], archivo.name.replace(/\.(heic|heif)$/i, '.jpg'), { type: 'image/jpeg' })
       } catch (err) {
-        console.error('Error convirtiendo HEIF:', err)
-        setSubiendoFoto(false)
-        return
+        setSubiendoFoto(false); return
       }
     }
 
     const extension = archivoFinal.name.split('.').pop()
     const nombreArchivo = `${logActual.id}/${Date.now()}.${extension}`
-
-    const { error: uploadError } = await supabase.storage
-      .from('fotos-bitacora').upload(nombreArchivo, archivoFinal)
-
+    const { error: uploadError } = await supabase.storage.from('fotos-bitacora').upload(nombreArchivo, archivoFinal)
     if (uploadError) { setSubiendoFoto(false); return }
 
-    const { data: urlData } = supabase.storage
-      .from('fotos-bitacora').getPublicUrl(nombreArchivo)
-
-    const { data: foto } = await supabase
-      .from('log_fotos')
-      .insert({ log_id: logActual.id, url: urlData.publicUrl })
-      .select().single()
-
+    const { data: urlData } = supabase.storage.from('fotos-bitacora').getPublicUrl(nombreArchivo)
+    const { data: foto } = await supabase.from('log_fotos')
+      .insert({ log_id: logActual.id, url: urlData.publicUrl }).select().single()
     if (foto) setFotos([...fotos, foto])
     setSubiendoFoto(false)
   }
@@ -204,6 +195,9 @@ const subirFoto = async (e) => {
     })
   }
 
+  const puedeEditar = rolUsuario === 'director' || rolUsuario === 'residente'
+  const esCliente = rolUsuario === 'cliente'
+
   if (loading) return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center">
       <p className="text-gray-500">Cargando...</p>
@@ -212,6 +206,7 @@ const subirFoto = async (e) => {
 
   return (
     <div className="min-h-screen bg-gray-50">
+
       {/* Modal foto */}
       {fotoSeleccionada && (
         <div className="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-50 p-4"
@@ -222,10 +217,13 @@ const subirFoto = async (e) => {
               className="absolute top-2 right-2 bg-white rounded-full p-1 text-gray-800 hover:bg-gray-100">
               <X size={20} />
             </button>
-            <button onClick={() => eliminarFoto(fotoSeleccionada)}
-              className="absolute bottom-2 right-2 bg-red-500 text-white rounded-lg px-3 py-1.5 text-sm hover:bg-red-600 flex items-center gap-1">
-              <Trash2 size={14} /> Eliminar foto
-            </button>
+            {/* Botón eliminar foto solo si puede editar */}
+            {puedeEditar && (
+              <button onClick={() => eliminarFoto(fotoSeleccionada)}
+                className="absolute bottom-2 right-2 bg-red-500 text-white rounded-lg px-3 py-1.5 text-sm hover:bg-red-600 flex items-center gap-1">
+                <Trash2 size={14} /> Eliminar foto
+              </button>
+            )}
           </div>
         </div>
       )}
@@ -249,33 +247,46 @@ const subirFoto = async (e) => {
                 'bg-yellow-100 text-yellow-700'
               }`}>{log.estado}</span>
             )}
-            
+            {esCliente && (
+              <span className="text-xs bg-gray-100 text-gray-500 px-2 py-1 rounded-full flex items-center gap-1">
+                <Eye size={11} /> Solo lectura
+              </span>
+            )}
           </div>
         </div>
       </header>
 
       <main className="max-w-3xl mx-auto px-4 py-6 space-y-6">
-        {/* Condiciones */}
+
+        {/* Condiciones del día */}
         <div className="bg-white rounded-xl p-5 shadow-sm">
           <h2 className="font-bold text-gray-800 mb-4">Condiciones del día</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm text-gray-600 mb-1">Clima</label>
-              <select value={clima} onChange={(e) => setClima(e.target.value)}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-gray-800 focus:outline-none focus:ring-2 focus:ring-green-500">
-                <option value="">Seleccionar</option>
-                <option value="Soleado">☀️ Soleado</option>
-                <option value="Nublado">⛅ Nublado</option>
-                <option value="Lluvioso">🌧 Lluvioso</option>
-                <option value="Parcialmente nublado">🌤 Parcialmente nublado</option>
-                <option value="Tormenta">⛈ Tormenta</option>
-              </select>
+              {esCliente ? (
+                <p className="text-gray-800 px-3 py-2 bg-gray-50 rounded-lg text-sm">{clima || '—'}</p>
+              ) : (
+                <select value={clima} onChange={(e) => setClima(e.target.value)}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-gray-800 focus:outline-none focus:ring-2 focus:ring-green-500">
+                  <option value="">Seleccionar</option>
+                  <option value="Soleado">☀️ Soleado</option>
+                  <option value="Nublado">⛅ Nublado</option>
+                  <option value="Lluvioso">🌧 Lluvioso</option>
+                  <option value="Parcialmente nublado">🌤 Parcialmente nublado</option>
+                  <option value="Tormenta">⛈ Tormenta</option>
+                </select>
+              )}
             </div>
             <div>
               <label className="block text-sm text-gray-600 mb-1">Personal en sitio</label>
-              <input type="number" value={personal} onChange={(e) => setPersonal(e.target.value)}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-gray-800 focus:outline-none focus:ring-2 focus:ring-green-500"
-                min={0} placeholder="0" />
+              {esCliente ? (
+                <p className="text-gray-800 px-3 py-2 bg-gray-50 rounded-lg text-sm">{personal || '0'} personas</p>
+              ) : (
+                <input type="number" value={personal} onChange={(e) => setPersonal(e.target.value)}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-gray-800 focus:outline-none focus:ring-2 focus:ring-green-500"
+                  min={0} placeholder="0" />
+              )}
             </div>
           </div>
         </div>
@@ -284,9 +295,12 @@ const subirFoto = async (e) => {
         <div className="bg-white rounded-xl p-5 shadow-sm">
           <div className="flex items-center gap-2 mb-4">
             <h2 className="font-bold text-gray-800">Actividades realizadas</h2>
-            <TooltipActividades />
+            {puedeEditar && <TooltipActividades />}
           </div>
-          {actividades.length > 0 && (
+
+          {actividades.length === 0 && esCliente ? (
+            <p className="text-sm text-gray-400 text-center py-4">No hay actividades registradas</p>
+          ) : (
             <div className="space-y-3 mb-4">
               {actividades.map((a) => (
                 <div key={a.id} className="border border-gray-100 rounded-lg p-3 bg-gray-50">
@@ -314,7 +328,7 @@ const subirFoto = async (e) => {
                           className="flex items-center gap-1 bg-green-700 text-white px-3 py-1.5 rounded-lg text-xs hover:bg-green-800">
                           <Check size={13} /> Guardar
                         </button>
-                        <button onClick={cancelarEdicion}
+                        <button onClick={() => setEditandoId(null)}
                           className="flex items-center gap-1 border border-gray-300 text-gray-600 px-3 py-1.5 rounded-lg text-xs hover:bg-gray-50">
                           <X size={13} /> Cancelar
                         </button>
@@ -331,61 +345,69 @@ const subirFoto = async (e) => {
                         )}
                         <p className="text-sm text-gray-800">{a.descripcion}</p>
                       </div>
-                      <div className="flex gap-1 ml-2">
-                        <button onClick={() => iniciarEdicion(a)} className="text-gray-400 hover:text-blue-500">
-                          <Pencil size={14} />
-                        </button>
-                        <button onClick={() => eliminarActividad(a.id)} className="text-gray-400 hover:text-red-500">
-                          <Trash2 size={14} />
-                        </button>
-                      </div>
+                      {/* Botones editar/borrar solo si puede editar */}
+                      {puedeEditar && (
+                        <div className="flex gap-1 ml-2">
+                          <button onClick={() => iniciarEdicion(a)} className="text-gray-400 hover:text-blue-500">
+                            <Pencil size={14} />
+                          </button>
+                          <button onClick={() => eliminarActividad(a.id)} className="text-gray-400 hover:text-red-500">
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
               ))}
             </div>
           )}
-          <div className="border border-dashed border-gray-300 rounded-lg p-4 space-y-3">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <input type="text" placeholder="Capítulo (ej: Estructura)"
-                value={nuevaActividad.capitulo}
-                onChange={(e) => setNuevaActividad({...nuevaActividad, capitulo: e.target.value})}
+
+          {/* Formulario nueva actividad — solo si puede editar */}
+          {puedeEditar && (
+            <div className="border border-dashed border-gray-300 rounded-lg p-4 space-y-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <input type="text" placeholder="Capítulo (ej: Estructura)"
+                  value={nuevaActividad.capitulo}
+                  onChange={(e) => setNuevaActividad({...nuevaActividad, capitulo: e.target.value})}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-green-500"
+                />
+                <input type="text" placeholder="Item (ej: Columnas)"
+                  value={nuevaActividad.partida}
+                  onChange={(e) => setNuevaActividad({...nuevaActividad, partida: e.target.value})}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-green-500"
+                />
+              </div>
+              <textarea placeholder="Descripción de la actividad realizada..."
+                value={nuevaActividad.descripcion}
+                onChange={(e) => setNuevaActividad({...nuevaActividad, descripcion: e.target.value})}
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-green-500"
+                rows={3}
               />
-              <input type="text" placeholder="Item (ej: Columnas)"
-                value={nuevaActividad.partida}
-                onChange={(e) => setNuevaActividad({...nuevaActividad, partida: e.target.value})}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-green-500"
-              />
+              <button onClick={agregarActividad}
+                className="flex items-center gap-2 bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-lg text-sm transition">
+                <Plus size={16} /> Agregar actividad
+              </button>
             </div>
-            <textarea placeholder="Descripción de la actividad realizada..."
-              value={nuevaActividad.descripcion}
-              onChange={(e) => setNuevaActividad({...nuevaActividad, descripcion: e.target.value})}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-green-500"
-              rows={3}
-            />
-            <button onClick={agregarActividad}
-              className="flex items-center gap-2 bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-lg text-sm transition">
-              <Plus size={16} /> Agregar actividad
-            </button>
-          </div>
+          )}
         </div>
 
         {/* Fotos */}
         <div className="bg-white rounded-xl p-5 shadow-sm">
           <div className="flex items-center justify-between mb-4">
             <h2 className="font-bold text-gray-800">Fotos del día</h2>
-            <label className={`flex items-center gap-2 bg-green-700 text-white px-4 py-2 rounded-lg text-sm cursor-pointer hover:bg-green-800 transition ${subiendoFoto ? 'opacity-50 cursor-not-allowed' : ''}`}>
-              <Camera size={16} />
-              {subiendoFoto ? 'Subiendo...' : 'Agregar foto'}
-              <input type="file" accept="image/*" onChange={subirFoto} className="hidden" disabled={subiendoFoto} />
-            </label>
+            {puedeEditar && (
+              <label className={`flex items-center gap-2 bg-green-700 text-white px-4 py-2 rounded-lg text-sm cursor-pointer hover:bg-green-800 transition ${subiendoFoto ? 'opacity-50 cursor-not-allowed' : ''}`}>
+                <Camera size={16} />
+                {subiendoFoto ? 'Subiendo...' : 'Agregar foto'}
+                <input type="file" accept="image/*" onChange={subirFoto} className="hidden" disabled={subiendoFoto} />
+              </label>
+            )}
           </div>
           {fotos.length === 0 ? (
             <div className="text-center py-8 text-gray-400">
               <Image size={36} className="mx-auto mb-2 opacity-40" />
               <p className="text-sm">No hay fotos aún</p>
-              <p className="text-xs">Agrega fotos desde tu celular o computador</p>
             </div>
           ) : (
             <div className="grid grid-cols-3 gap-2">
@@ -402,26 +424,34 @@ const subirFoto = async (e) => {
         {/* Observaciones */}
         <div className="bg-white rounded-xl p-5 shadow-sm">
           <h2 className="font-bold text-gray-800 mb-4">Observaciones e incidentes</h2>
-          <textarea
-            placeholder="Anota cualquier observación importante, incidente o novedad del día..."
-            value={observaciones}
-            onChange={(e) => setObservaciones(e.target.value)}
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-gray-800 focus:outline-none focus:ring-2 focus:ring-green-500"
-            rows={4}
-          />
+          {esCliente ? (
+            <p className="text-gray-800 px-3 py-2 bg-gray-50 rounded-lg text-sm min-h-[80px]">
+              {observaciones || 'Sin observaciones registradas'}
+            </p>
+          ) : (
+            <textarea
+              placeholder="Anota cualquier observación importante, incidente o novedad del día..."
+              value={observaciones}
+              onChange={(e) => setObservaciones(e.target.value)}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-gray-800 focus:outline-none focus:ring-2 focus:ring-green-500"
+              rows={4}
+            />
+          )}
         </div>
 
-        {/* Botones */}
-        <div className="flex flex-col sm:flex-row gap-3 pb-8">
-          <button onClick={() => guardarBitacora('borrador')} disabled={guardando}
-            className="flex-1 flex items-center justify-center gap-2 border border-gray-300 text-gray-700 py-3 rounded-xl hover:bg-gray-50 transition disabled:opacity-50">
-            <Save size={18} /> Guardar borrador
-          </button>
-          <button onClick={() => guardarBitacora('publicada')} disabled={guardando}
-            className="flex-1 flex items-center justify-center gap-2 bg-green-700 text-white py-3 rounded-xl hover:bg-green-800 transition disabled:opacity-50">
-            <Send size={18} /> Publicar bitácora
-          </button>
-        </div>
+        {/* Botones guardar — solo si puede editar */}
+        {puedeEditar && (
+          <div className="flex flex-col sm:flex-row gap-3 pb-8">
+            <button onClick={() => guardarBitacora('borrador')} disabled={guardando}
+              className="flex-1 flex items-center justify-center gap-2 border border-gray-300 text-gray-700 py-3 rounded-xl hover:bg-gray-50 transition disabled:opacity-50">
+              <Save size={18} /> Guardar borrador
+            </button>
+            <button onClick={() => guardarBitacora('publicada')} disabled={guardando}
+              className="flex-1 flex items-center justify-center gap-2 bg-green-700 text-white py-3 rounded-xl hover:bg-green-800 transition disabled:opacity-50">
+              <Send size={18} /> Publicar bitácora
+            </button>
+          </div>
+        )}
       </main>
     </div>
   )
