@@ -25,14 +25,17 @@ export default function Dashboard() {
       .from('profiles').select('*, organizations(*)').eq('id', user.id).single()
     if (!prof) { setLoading(false); return }
     setProfile(prof)
+
+    // Proyectos de su org
     const { data: projs1 } = await supabase
       .from('projects').select('*').eq('org_id', prof.org_id)
-    
+
+    // Proyectos donde es miembro invitado
     const { data: memberships } = await supabase
       .from('project_members').select('project_id').eq('user_id', prof.id)
-    
+
     const projectIds = (memberships || []).map(m => m.project_id)
-    
+
     let projs2 = []
     if (projectIds.length > 0) {
       const { data } = await supabase
@@ -40,11 +43,10 @@ export default function Dashboard() {
       projs2 = data || []
     }
 
-    const todosLosProyectos = [...(projs1 || []), ...projs2.filter(p => 
+    const todos = [...(projs1 || []), ...projs2.filter(p =>
       !(projs1 || []).find(p1 => p1.id === p.id)
     )]
-    setProjects(todosLosProyectos.sort((a, b) => new Date(b.created_at) - new Date(a.created_at)))
-    setProjects(projs || [])
+    setProjects(todos.sort((a, b) => new Date(b.created_at) - new Date(a.created_at)))
     setLoading(false)
   }
 
@@ -76,19 +78,13 @@ export default function Dashboard() {
   }
 
   const guardarEdicion = async (id) => {
-    const payload = {
-      nombre: editData.nombre,
-      estado: editData.estado || 'activo',
-    }
+    const payload = { nombre: editData.nombre, estado: editData.estado || 'activo' }
     payload.ubicacion = editData.ubicacion || null
     payload.descripcion = editData.descripcion || null
     payload.fecha_inicio = editData.fecha_inicio || null
     payload.fecha_fin_estimada = editData.fecha_fin_estimada || null
-
     const { error } = await supabase.from('projects').update(payload).eq('id', id)
-    if (!error) {
-      setProjects(projects.map(p => p.id === id ? { ...p, ...payload } : p))
-    }
+    if (!error) setProjects(projects.map(p => p.id === id ? { ...p, ...payload } : p))
     setEditando(null)
   }
 
@@ -129,8 +125,6 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-
-      {/* Modal confirmación borrar proyecto */}
       {confirmBorrar && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl p-6 w-full max-w-sm shadow-xl">
@@ -146,7 +140,7 @@ export default function Dashboard() {
             <div className="bg-red-50 border border-red-200 rounded-lg px-4 py-3 mb-5">
               <p className="text-red-700 text-sm font-medium flex items-center gap-2">
                 <AlertTriangle size={14} />
-                Esta acción es irreversible. Todos los datos, bitácoras, fotos y actividades se perderán para siempre y no podrán recuperarse.
+                Esta acción es irreversible. Todos los datos, bitácoras, fotos y actividades se perderán para siempre.
               </p>
             </div>
             <div className="flex gap-3">
@@ -163,7 +157,6 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* Modal editar proyecto */}
       {editando && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl p-6 w-full max-w-md shadow-xl">
@@ -176,19 +169,16 @@ export default function Dashboard() {
             <div className="space-y-3">
               <div>
                 <label className="text-xs text-gray-500 mb-1 block">Nombre *</label>
-                <input type="text" required
-                  value={editData.nombre}
+                <input type="text" required value={editData.nombre}
                   onChange={(e) => setEditData({...editData, nombre: e.target.value})}
                   className="w-full border border-gray-300 rounded-lg px-4 py-2 text-gray-800 focus:outline-none focus:ring-2 focus:ring-green-500"
                 />
               </div>
               <div>
                 <label className="text-xs text-gray-500 mb-1 block">Estado del proyecto</label>
-                <select
-                  value={editData.estado || 'activo'}
+                <select value={editData.estado || 'activo'}
                   onChange={(e) => setEditData({...editData, estado: e.target.value})}
-                  className="w-full border border-gray-300 rounded-lg px-4 py-2 text-gray-800 focus:outline-none focus:ring-2 focus:ring-green-500"
-                >
+                  className="w-full border border-gray-300 rounded-lg px-4 py-2 text-gray-800 focus:outline-none focus:ring-2 focus:ring-green-500">
                   <option value="activo">Activo</option>
                   <option value="en pausa">En pausa</option>
                   <option value="terminado">Terminado</option>
@@ -197,16 +187,14 @@ export default function Dashboard() {
               </div>
               <div>
                 <label className="text-xs text-gray-500 mb-1 block">Ubicacion</label>
-                <input type="text" placeholder="Opcional"
-                  value={editData.ubicacion}
+                <input type="text" placeholder="Opcional" value={editData.ubicacion}
                   onChange={(e) => setEditData({...editData, ubicacion: e.target.value})}
                   className="w-full border border-gray-300 rounded-lg px-4 py-2 text-gray-800 focus:outline-none focus:ring-2 focus:ring-green-500"
                 />
               </div>
               <div>
                 <label className="text-xs text-gray-500 mb-1 block">Descripcion</label>
-                <textarea placeholder="Opcional"
-                  value={editData.descripcion}
+                <textarea placeholder="Opcional" value={editData.descripcion}
                   onChange={(e) => setEditData({...editData, descripcion: e.target.value})}
                   className="w-full border border-gray-300 rounded-lg px-4 py-2 text-gray-800 focus:outline-none focus:ring-2 focus:ring-green-500"
                   rows={2}
@@ -217,13 +205,10 @@ export default function Dashboard() {
                   <label className="text-xs text-gray-500">Fecha inicio</label>
                   {editData.fecha_inicio && (
                     <button onClick={() => setEditData({...editData, fecha_inicio: ''})}
-                      className="text-xs text-red-400 hover:text-red-600">
-                      Borrar fecha
-                    </button>
+                      className="text-xs text-red-400 hover:text-red-600">Borrar fecha</button>
                   )}
                 </div>
-                <input type="date"
-                  value={editData.fecha_inicio}
+                <input type="date" value={editData.fecha_inicio}
                   onChange={(e) => setEditData({...editData, fecha_inicio: e.target.value})}
                   className="w-full border border-gray-300 rounded-lg px-2 py-2 text-gray-800 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
                 />
@@ -233,13 +218,10 @@ export default function Dashboard() {
                   <label className="text-xs text-gray-500">Fecha fin estimada</label>
                   {editData.fecha_fin_estimada && (
                     <button onClick={() => setEditData({...editData, fecha_fin_estimada: ''})}
-                      className="text-xs text-red-400 hover:text-red-600">
-                      Borrar fecha
-                    </button>
+                      className="text-xs text-red-400 hover:text-red-600">Borrar fecha</button>
                   )}
                 </div>
-                <input type="date"
-                  value={editData.fecha_fin_estimada}
+                <input type="date" value={editData.fecha_fin_estimada}
                   onChange={(e) => setEditData({...editData, fecha_fin_estimada: e.target.value})}
                   className="w-full border border-gray-300 rounded-lg px-2 py-2 text-gray-800 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
                 />
@@ -280,15 +262,12 @@ export default function Dashboard() {
       <main className="max-w-6xl mx-auto px-4 py-8">
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-2xl font-bold text-gray-800">Mis proyectos</h2>
-          <button
-            onClick={() => setShowNewProject(true)}
-            className="flex items-center gap-2 bg-green-700 text-white px-4 py-2 rounded-lg hover:bg-green-800 transition"
-          >
+          <button onClick={() => setShowNewProject(true)}
+            className="flex items-center gap-2 bg-green-700 text-white px-4 py-2 rounded-lg hover:bg-green-800 transition">
             <Plus size={18} /> Nuevo proyecto
           </button>
         </div>
 
-        {/* Modal nuevo proyecto */}
         {showNewProject && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
             <div className="bg-white rounded-2xl p-6 w-full max-w-md shadow-xl">
@@ -318,16 +297,14 @@ export default function Dashboard() {
                 <div className="flex flex-col gap-3">
                   <div>
                     <label className="text-xs text-gray-500 mb-1 block">Fecha inicio (opcional)</label>
-                    <input type="date"
-                      value={newProject.fecha_inicio}
+                    <input type="date" value={newProject.fecha_inicio}
                       onChange={(e) => setNewProject({...newProject, fecha_inicio: e.target.value})}
                       className="w-full border border-gray-300 rounded-lg px-2 py-2 text-gray-800 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
                     />
                   </div>
                   <div>
                     <label className="text-xs text-gray-500 mb-1 block">Fecha fin estimada (opcional)</label>
-                    <input type="date"
-                      value={newProject.fecha_fin_estimada}
+                    <input type="date" value={newProject.fecha_fin_estimada}
                       onChange={(e) => setNewProject({...newProject, fecha_fin_estimada: e.target.value})}
                       className="w-full border border-gray-300 rounded-lg px-2 py-2 text-gray-800 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
                     />
@@ -348,7 +325,6 @@ export default function Dashboard() {
           </div>
         )}
 
-        {/* Lista de proyectos */}
         {projects.length === 0 ? (
           <div className="text-center py-16 text-gray-400">
             <FolderOpen size={48} className="mx-auto mb-3 opacity-50" />
