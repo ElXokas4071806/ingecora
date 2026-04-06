@@ -1,26 +1,108 @@
 'use client'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { createClient } from '../../../../../lib/supabase'
 import { useRouter, usePathname } from 'next/navigation'
-import { ArrowLeft, Plus, Trash2, Save, Send, Pencil, Check, X, Camera, Image, Eye } from 'lucide-react'
+import { ArrowLeft, Plus, Trash2, Save, Send, Pencil, Check, X, Camera, Eye, CheckCircle } from 'lucide-react'
 
 function TooltipActividades() {
   const [visible, setVisible] = useState(false)
   return (
     <div className="relative inline-block">
       <button onClick={() => setVisible(!visible)}
-        className="w-5 h-5 rounded-full bg-gray-200 text-gray-500 flex items-center justify-center text-xs font-bold">
-        ?
-      </button>
+        className="w-5 h-5 rounded-full bg-gray-200 text-gray-500 flex items-center justify-center text-xs font-bold">?</button>
       {visible && (
         <>
           <div className="fixed inset-0 z-10" onClick={() => setVisible(false)} />
-          <div className="absolute right-0 top-7 w-56 bg-gray-800 text-white text-xs rounded-lg px-3 py-2 z-20 shadow-lg"
-            style={{ maxWidth: 'calc(100vw - 2rem)' }}>
+          <div className="absolute right-0 top-7 w-56 bg-gray-800 text-white text-xs rounded-lg px-3 py-2 z-20 shadow-lg">
             Digite la información relacionada a la actividad y de clic en "Agregar actividad"
             <button onClick={() => setVisible(false)} className="block mt-2 text-gray-400 hover:text-white">Cerrar ✕</button>
           </div>
         </>
+      )}
+    </div>
+  )
+}
+
+function FirmaCanvas({ onFirma }) {
+  const canvasRef = useRef(null)
+  const dibujando = useRef(false)
+  const [tieneFirma, setTieneFirma] = useState(false)
+
+  const getPos = (e, canvas) => {
+    const rect = canvas.getBoundingClientRect()
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX
+    const clientY = e.touches ? e.touches[0].clientY : e.clientY
+    return { x: clientX - rect.left, y: clientY - rect.top }
+  }
+
+  const iniciar = (e) => {
+    e.preventDefault()
+    const canvas = canvasRef.current
+    const ctx = canvas.getContext('2d')
+    const pos = getPos(e, canvas)
+    ctx.beginPath()
+    ctx.moveTo(pos.x, pos.y)
+    dibujando.current = true
+  }
+
+  const dibujar = (e) => {
+    e.preventDefault()
+    if (!dibujando.current) return
+    const canvas = canvasRef.current
+    const ctx = canvas.getContext('2d')
+    const pos = getPos(e, canvas)
+    ctx.lineTo(pos.x, pos.y)
+    ctx.strokeStyle = '#1a1a1a'
+    ctx.lineWidth = 2.5
+    ctx.lineCap = 'round'
+    ctx.lineJoin = 'round'
+    ctx.stroke()
+    setTieneFirma(true)
+  }
+
+  const terminar = (e) => {
+    e.preventDefault()
+    dibujando.current = false
+    if (tieneFirma) {
+      onFirma(canvasRef.current.toDataURL('image/png'))
+    }
+  }
+
+  const limpiar = () => {
+    const canvas = canvasRef.current
+    const ctx = canvas.getContext('2d')
+    ctx.clearRect(0, 0, canvas.width, canvas.height)
+    setTieneFirma(false)
+    onFirma(null)
+  }
+
+  return (
+    <div>
+      <div className="relative border-2 border-dashed border-gray-300 rounded-xl overflow-hidden bg-white" style={{ touchAction: 'none' }}>
+        <canvas
+          ref={canvasRef}
+          width={600}
+          height={160}
+          className="w-full"
+          style={{ cursor: 'crosshair', touchAction: 'none' }}
+          onMouseDown={iniciar}
+          onMouseMove={dibujar}
+          onMouseUp={terminar}
+          onMouseLeave={terminar}
+          onTouchStart={iniciar}
+          onTouchMove={dibujar}
+          onTouchEnd={terminar}
+        />
+        {!tieneFirma && (
+          <p className="absolute inset-0 flex items-center justify-center text-gray-400 text-sm pointer-events-none">
+            Firme aquí con el dedo o el cursor
+          </p>
+        )}
+      </div>
+      {tieneFirma && (
+        <button onClick={limpiar} className="mt-2 text-xs text-red-500 hover:text-red-700 flex items-center gap-1">
+          <X size={12} /> Limpiar firma
+        </button>
       )}
     </div>
   )
@@ -43,6 +125,13 @@ export default function BitacoraPage() {
   const [fecha, setFecha] = useState(null)
   const [fotoSeleccionada, setFotoSeleccionada] = useState(null)
   const [rolUsuario, setRolUsuario] = useState(null)
+  const [nombreDirector, setNombreDirector] = useState('')
+  // Aprobación
+  const [mostrarAprobacion, setMostrarAprobacion] = useState(false)
+  const [comentarioDirector, setComentarioDirector] = useState('')
+  const [firmaDirector, setFirmaDirector] = useState(null)
+  const [aprobando, setAprobando] = useState(false)
+
   const router = useRouter()
   const pathname = usePathname()
   const supabase = createClient()
@@ -58,32 +147,25 @@ export default function BitacoraPage() {
 
   const loadData = async (id, f) => {
     const { data: { user } } = await supabase.auth.getUser()
+    const { data: prof } = await supabase.from('profiles').select('nombre').eq('id', user.id).single()
+    setNombreDirector(prof?.nombre || '')
 
-    // Determinar rol
     const { data: membresia } = await supabase
-      .from('project_members')
-      .select('rol')
-      .eq('project_id', id)
-      .eq('user_id', user.id)
-      .single()
+      .from('project_members').select('rol').eq('project_id', id).eq('user_id', user.id).single()
     setRolUsuario(membresia?.rol || 'cliente')
 
     const { data: existingLog } = await supabase
-      .from('daily_logs').select('*')
-      .eq('project_id', id).eq('fecha', f).maybeSingle()
+      .from('daily_logs').select('*').eq('project_id', id).eq('fecha', f).maybeSingle()
 
     if (existingLog) {
       setLog(existingLog)
       setClima(existingLog.clima || '')
       setPersonal(existingLog.personal_en_sitio ?? '')
       setObservaciones(existingLog.observaciones || '')
-      const { data: acts } = await supabase
-        .from('log_actividades').select('*')
-        .eq('log_id', existingLog.id).order('orden')
+      setComentarioDirector(existingLog.comentario_director || '')
+      const { data: acts } = await supabase.from('log_actividades').select('*').eq('log_id', existingLog.id).order('orden')
       setActividades(acts || [])
-      const { data: fts } = await supabase
-        .from('log_fotos').select('*')
-        .eq('log_id', existingLog.id).order('created_at')
+      const { data: fts } = await supabase.from('log_fotos').select('*').eq('log_id', existingLog.id).order('created_at')
       setFotos(fts || [])
     }
     setLoading(false)
@@ -117,18 +199,38 @@ export default function BitacoraPage() {
     if (estado === 'publicada') router.push(`/dashboard/proyectos/${proyectoId}`)
   }
 
+  const aprobarBitacora = async () => {
+    if (!firmaDirector) { alert('Por favor dibuje su firma antes de aprobar.'); return }
+    if (!log) return
+    setAprobando(true)
+    const { data: { user } } = await supabase.auth.getUser()
+
+    // Subir firma como imagen al storage
+    const blob = await (await fetch(firmaDirector)).blob()
+    const nombreArchivo = `firmas/${log.id}/firma_director.png`
+    await supabase.storage.from('fotos-bitacora').upload(nombreArchivo, blob, { upsert: true, contentType: 'image/png' })
+    const { data: urlData } = supabase.storage.from('fotos-bitacora').getPublicUrl(nombreArchivo)
+
+    await supabase.from('daily_logs').update({
+      estado: 'aprobada',
+      comentario_director: comentarioDirector,
+      firma_director: urlData.publicUrl,
+      aprobado_por: user.id,
+      aprobado_en: new Date().toISOString()
+    }).eq('id', log.id)
+
+    setLog({ ...log, estado: 'aprobada', comentario_director: comentarioDirector, firma_director: urlData.publicUrl })
+    setMostrarAprobacion(false)
+    setAprobando(false)
+  }
+
   const agregarActividad = async () => {
     if (!nuevaActividad.descripcion) return
     const logActual = await obtenerOCrearLog(proyectoId, fecha)
     if (!logActual) return
-    const { data: act } = await supabase
-      .from('log_actividades')
-      .insert({ ...nuevaActividad, log_id: logActual.id, orden: actividades.length })
-      .select().single()
-    if (act) {
-      setActividades([...actividades, act])
-      setNuevaActividad({ capitulo: '', partida: '', descripcion: '' })
-    }
+    const { data: act } = await supabase.from('log_actividades')
+      .insert({ ...nuevaActividad, log_id: logActual.id, orden: actividades.length }).select().single()
+    if (act) { setActividades([...actividades, act]); setNuevaActividad({ capitulo: '', partida: '', descripcion: '' }) }
   }
 
   const eliminarActividad = async (id) => {
@@ -157,25 +259,20 @@ export default function BitacoraPage() {
     let archivoFinal = archivo
     const esHEIF = archivo.type === 'image/heic' || archivo.type === 'image/heif' ||
       archivo.name.toLowerCase().endsWith('.heic') || archivo.name.toLowerCase().endsWith('.heif')
-
     if (esHEIF) {
       try {
         const heic2any = (await import('heic2any')).default
         const blob = await heic2any({ blob: archivo, toType: 'image/jpeg', quality: 0.8 })
         archivoFinal = new File([blob], archivo.name.replace(/\.(heic|heif)$/i, '.jpg'), { type: 'image/jpeg' })
-      } catch (err) {
-        setSubiendoFoto(false); return
-      }
+      } catch { setSubiendoFoto(false); return }
     }
 
     const extension = archivoFinal.name.split('.').pop()
     const nombreArchivo = `${logActual.id}/${Date.now()}.${extension}`
     const { error: uploadError } = await supabase.storage.from('fotos-bitacora').upload(nombreArchivo, archivoFinal)
     if (uploadError) { setSubiendoFoto(false); return }
-
     const { data: urlData } = supabase.storage.from('fotos-bitacora').getPublicUrl(nombreArchivo)
-    const { data: foto } = await supabase.from('log_fotos')
-      .insert({ log_id: logActual.id, url: urlData.publicUrl }).select().single()
+    const { data: foto } = await supabase.from('log_fotos').insert({ log_id: logActual.id, url: urlData.publicUrl }).select().single()
     if (foto) setFotos([...fotos, foto])
     setSubiendoFoto(false)
   }
@@ -196,7 +293,9 @@ export default function BitacoraPage() {
   }
 
   const puedeEditar = rolUsuario === 'director' || rolUsuario === 'residente'
+  const esDirector = rolUsuario === 'director'
   const esCliente = rolUsuario === 'cliente'
+  const puedeAprobar = esDirector && log?.estado === 'publicada'
 
   if (loading) return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -217,13 +316,52 @@ export default function BitacoraPage() {
               className="absolute top-2 right-2 bg-white rounded-full p-1 text-gray-800 hover:bg-gray-100">
               <X size={20} />
             </button>
-            {/* Botón eliminar foto solo si puede editar */}
             {puedeEditar && (
               <button onClick={() => eliminarFoto(fotoSeleccionada)}
                 className="absolute bottom-2 right-2 bg-red-500 text-white rounded-lg px-3 py-1.5 text-sm hover:bg-red-600 flex items-center gap-1">
                 <Trash2 size={14} /> Eliminar foto
               </button>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Modal aprobación */}
+      {mostrarAprobacion && (
+        <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl p-6 w-full max-w-lg shadow-xl">
+            <h3 className="text-lg font-bold text-gray-800 mb-1">Aprobar bitácora</h3>
+            <p className="text-sm text-gray-500 mb-4 capitalize">{fechaFormateada()}</p>
+
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-1">Comentario del director</label>
+              <textarea
+                value={comentarioDirector}
+                onChange={(e) => setComentarioDirector(e.target.value)}
+                placeholder="Observaciones, aprobaciones o notas del director..."
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-gray-800 focus:outline-none focus:ring-2 focus:ring-green-500 text-sm"
+                rows={3}
+              />
+            </div>
+
+            <div className="mb-2">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Firma del director — {nombreDirector}
+              </label>
+              <FirmaCanvas onFirma={setFirmaDirector} />
+            </div>
+
+            <div className="flex gap-3 mt-5">
+              <button onClick={() => setMostrarAprobacion(false)}
+                className="flex-1 border border-gray-300 text-gray-700 py-2.5 rounded-xl hover:bg-gray-50 transition font-medium">
+                Cancelar
+              </button>
+              <button onClick={aprobarBitacora} disabled={aprobando || !firmaDirector}
+                className="flex-1 bg-green-700 text-white py-2.5 rounded-xl hover:bg-green-800 transition font-medium disabled:opacity-50 flex items-center justify-center gap-2">
+                <CheckCircle size={18} />
+                {aprobando ? 'Aprobando...' : 'Aprobar bitácora'}
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -258,6 +396,41 @@ export default function BitacoraPage() {
 
       <main className="max-w-3xl mx-auto px-4 py-6 space-y-6">
 
+        {/* Banner aprobación para director */}
+        {puedeAprobar && (
+          <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 flex items-center justify-between gap-3">
+            <div>
+              <p className="text-blue-800 font-medium text-sm">Esta bitácora está lista para aprobar</p>
+              <p className="text-blue-600 text-xs mt-0.5">El residente la publicó. Revísala y apruébala con tu firma.</p>
+            </div>
+            <button onClick={() => setMostrarAprobacion(true)}
+              className="bg-green-700 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-green-800 transition whitespace-nowrap flex items-center gap-1.5">
+              <CheckCircle size={15} /> Aprobar
+            </button>
+          </div>
+        )}
+
+        {/* Sello de aprobación si ya está aprobada */}
+        {log?.estado === 'aprobada' && log?.firma_director && (
+          <div className="bg-green-50 border border-green-200 rounded-xl p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <CheckCircle className="text-green-600" size={18} />
+              <p className="text-green-800 font-medium text-sm">
+                Bitácora aprobada — {log.aprobado_en ? new Date(log.aprobado_en).toLocaleDateString('es-CO', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : ''}
+              </p>
+            </div>
+            {log.comentario_director && (
+              <p className="text-gray-700 text-sm mb-3 bg-white rounded-lg px-3 py-2 border border-green-100">
+                💬 {log.comentario_director}
+              </p>
+            )}
+            <div className="bg-white rounded-lg p-2 border border-green-100 inline-block">
+              <p className="text-xs text-gray-400 mb-1">Firma del director</p>
+              <img src={log.firma_director} alt="Firma director" className="h-16 object-contain" />
+            </div>
+          </div>
+        )}
+
         {/* Condiciones del día */}
         <div className="bg-white rounded-xl p-5 shadow-sm">
           <h2 className="font-bold text-gray-800 mb-4">Condiciones del día</h2>
@@ -281,7 +454,7 @@ export default function BitacoraPage() {
             <div>
               <label className="block text-sm text-gray-600 mb-1">Personal en sitio</label>
               {esCliente ? (
-                <p className="text-gray-800 px-3 py-2 bg-gray-50 rounded-lg text-sm">{personal || '0'} personas</p>
+                <p className="text-gray-800 px-3 py-2 bg-gray-50 rounded-lg text-sm">{personal || '—'}</p>
               ) : (
                 <input type="number" value={personal} onChange={(e) => setPersonal(e.target.value)}
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 text-gray-800 focus:outline-none focus:ring-2 focus:ring-green-500"
@@ -293,36 +466,28 @@ export default function BitacoraPage() {
 
         {/* Actividades */}
         <div className="bg-white rounded-xl p-5 shadow-sm">
-          <div className="flex items-center gap-2 mb-4">
+          <div className="flex items-center justify-between mb-4">
             <h2 className="font-bold text-gray-800">Actividades realizadas</h2>
-            {puedeEditar && <TooltipActividades />}
+            <TooltipActividades />
           </div>
-
-          {actividades.length === 0 && esCliente ? (
-            <p className="text-sm text-gray-400 text-center py-4">No hay actividades registradas</p>
-          ) : (
+          {actividades.length > 0 && (
             <div className="space-y-3 mb-4">
               {actividades.map((a) => (
                 <div key={a.id} className="border border-gray-100 rounded-lg p-3 bg-gray-50">
                   {editandoId === a.id ? (
                     <div className="space-y-2">
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                        <input type="text" placeholder="Capítulo"
-                          value={editandoData.capitulo}
-                          onChange={(e) => setEditandoData({...editandoData, capitulo: e.target.value})}
-                          className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-green-500"
-                        />
-                        <input type="text" placeholder="Item"
-                          value={editandoData.partida}
-                          onChange={(e) => setEditandoData({...editandoData, partida: e.target.value})}
-                          className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-green-500"
-                        />
+                      <div className="grid grid-cols-2 gap-2">
+                        <input type="text" placeholder="Capítulo" value={editandoData.capitulo}
+                          onChange={(e) => setEditandoData({ ...editandoData, capitulo: e.target.value })}
+                          className="border border-gray-300 rounded-lg px-2 py-1.5 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-green-500" />
+                        <input type="text" placeholder="Partida" value={editandoData.partida}
+                          onChange={(e) => setEditandoData({ ...editandoData, partida: e.target.value })}
+                          className="border border-gray-300 rounded-lg px-2 py-1.5 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-green-500" />
                       </div>
                       <textarea value={editandoData.descripcion}
-                        onChange={(e) => setEditandoData({...editandoData, descripcion: e.target.value})}
-                        className="w-full border border-gray-300 rounded-lg px-3 py-1.5 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-green-500"
-                        rows={2}
-                      />
+                        onChange={(e) => setEditandoData({ ...editandoData, descripcion: e.target.value })}
+                        className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-green-500"
+                        rows={2} />
                       <div className="flex gap-2">
                         <button onClick={() => guardarEdicion(a.id)}
                           className="flex items-center gap-1 bg-green-700 text-white px-3 py-1.5 rounded-lg text-xs hover:bg-green-800">
@@ -338,20 +503,19 @@ export default function BitacoraPage() {
                     <div className="flex items-start justify-between">
                       <div className="flex-1">
                         {(a.capitulo || a.partida) && (
-                          <div className="flex gap-2 mb-1">
+                          <div className="flex gap-2 mb-1 flex-wrap">
                             {a.capitulo && <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full">{a.capitulo}</span>}
                             {a.partida && <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">{a.partida}</span>}
                           </div>
                         )}
                         <p className="text-sm text-gray-800">{a.descripcion}</p>
                       </div>
-                      {/* Botones editar/borrar solo si puede editar */}
                       {puedeEditar && (
                         <div className="flex gap-1 ml-2">
-                          <button onClick={() => iniciarEdicion(a)} className="text-gray-400 hover:text-blue-500">
+                          <button onClick={() => iniciarEdicion(a)} className="text-gray-400 hover:text-blue-500 p-1 rounded hover:bg-blue-50 transition">
                             <Pencil size={14} />
                           </button>
-                          <button onClick={() => eliminarActividad(a.id)} className="text-gray-400 hover:text-red-500">
+                          <button onClick={() => eliminarActividad(a.id)} className="text-gray-400 hover:text-red-500 p-1 rounded hover:bg-red-50 transition">
                             <Trash2 size={14} />
                           </button>
                         </div>
@@ -362,62 +526,55 @@ export default function BitacoraPage() {
               ))}
             </div>
           )}
-
-          {/* Formulario nueva actividad — solo si puede editar */}
           {puedeEditar && (
             <div className="border border-dashed border-gray-300 rounded-lg p-4 space-y-3">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <input type="text" placeholder="Capítulo (ej: Estructura)"
-                  value={nuevaActividad.capitulo}
-                  onChange={(e) => setNuevaActividad({...nuevaActividad, capitulo: e.target.value})}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-green-500"
-                />
-                <input type="text" placeholder="Item (ej: Columnas)"
-                  value={nuevaActividad.partida}
-                  onChange={(e) => setNuevaActividad({...nuevaActividad, partida: e.target.value})}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-green-500"
-                />
+              <div className="grid grid-cols-2 gap-3">
+                <input type="text" placeholder="Capítulo (ej: Estructura)" value={nuevaActividad.capitulo}
+                  onChange={(e) => setNuevaActividad({ ...nuevaActividad, capitulo: e.target.value })}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-green-500" />
+                <input type="text" placeholder="Partida (ej: Columnas)" value={nuevaActividad.partida}
+                  onChange={(e) => setNuevaActividad({ ...nuevaActividad, partida: e.target.value })}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-green-500" />
               </div>
-              <textarea placeholder="Descripción de la actividad realizada..."
-                value={nuevaActividad.descripcion}
-                onChange={(e) => setNuevaActividad({...nuevaActividad, descripcion: e.target.value})}
+              <textarea placeholder="Descripción de la actividad realizada..." value={nuevaActividad.descripcion}
+                onChange={(e) => setNuevaActividad({ ...nuevaActividad, descripcion: e.target.value })}
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-green-500"
-                rows={3}
-              />
+                rows={3} />
               <button onClick={agregarActividad}
                 className="flex items-center gap-2 bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-lg text-sm transition">
                 <Plus size={16} /> Agregar actividad
               </button>
             </div>
           )}
+          {esCliente && actividades.length === 0 && (
+            <p className="text-gray-400 text-sm text-center py-4">No hay actividades registradas</p>
+          )}
         </div>
 
         {/* Fotos */}
         <div className="bg-white rounded-xl p-5 shadow-sm">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="font-bold text-gray-800">Fotos del día</h2>
-            {puedeEditar && (
-              <label className={`flex items-center gap-2 bg-green-700 text-white px-4 py-2 rounded-lg text-sm cursor-pointer hover:bg-green-800 transition ${subiendoFoto ? 'opacity-50 cursor-not-allowed' : ''}`}>
-                <Camera size={16} />
-                {subiendoFoto ? 'Subiendo...' : 'Agregar foto'}
-                <input type="file" accept="image/*" onChange={subirFoto} className="hidden" disabled={subiendoFoto} />
-              </label>
-            )}
-          </div>
-          {fotos.length === 0 ? (
-            <div className="text-center py-8 text-gray-400">
-              <Image size={36} className="mx-auto mb-2 opacity-40" />
-              <p className="text-sm">No hay fotos aún</p>
-            </div>
-          ) : (
-            <div className="grid grid-cols-3 gap-2">
+          <h2 className="font-bold text-gray-800 mb-4">Registro fotográfico</h2>
+          {fotos.length > 0 && (
+            <div className="grid grid-cols-3 gap-2 mb-4">
               {fotos.map((f) => (
                 <div key={f.id} onClick={() => setFotoSeleccionada(f)}
-                  className="aspect-square rounded-lg overflow-hidden cursor-pointer hover:opacity-90 transition">
-                  <img src={f.url} alt="Foto obra" className="w-full h-full object-cover" />
+                  className="aspect-square rounded-lg overflow-hidden cursor-pointer hover:opacity-90 transition bg-gray-100">
+                  <img src={f.url} alt="Foto" className="w-full h-full object-cover" />
                 </div>
               ))}
             </div>
+          )}
+          {puedeEditar && (
+            <label className={`flex items-center justify-center gap-2 border-2 border-dashed rounded-xl py-4 cursor-pointer transition ${subiendoFoto ? 'border-gray-200 bg-gray-50' : 'border-gray-300 hover:border-green-400 hover:bg-green-50'}`}>
+              <input type="file" accept="image/*" className="hidden" onChange={subirFoto} disabled={subiendoFoto} capture="environment" />
+              <Camera size={20} className={subiendoFoto ? 'text-gray-300' : 'text-gray-400'} />
+              <span className={`text-sm ${subiendoFoto ? 'text-gray-400' : 'text-gray-500'}`}>
+                {subiendoFoto ? 'Subiendo foto...' : 'Tomar o subir foto'}
+              </span>
+            </label>
+          )}
+          {esCliente && fotos.length === 0 && (
+            <p className="text-gray-400 text-sm text-center py-4">No hay fotos registradas</p>
           )}
         </div>
 
@@ -425,33 +582,29 @@ export default function BitacoraPage() {
         <div className="bg-white rounded-xl p-5 shadow-sm">
           <h2 className="font-bold text-gray-800 mb-4">Observaciones e incidentes</h2>
           {esCliente ? (
-            <p className="text-gray-800 px-3 py-2 bg-gray-50 rounded-lg text-sm min-h-[80px]">
-              {observaciones || 'Sin observaciones registradas'}
-            </p>
+            <p className="text-gray-800 text-sm bg-gray-50 rounded-lg px-3 py-3 min-h-[80px]">{observaciones || '—'}</p>
           ) : (
-            <textarea
-              placeholder="Anota cualquier observación importante, incidente o novedad del día..."
-              value={observaciones}
-              onChange={(e) => setObservaciones(e.target.value)}
+            <textarea placeholder="Anota cualquier observación importante, incidente o novedad del día..."
+              value={observaciones} onChange={(e) => setObservaciones(e.target.value)}
               className="w-full border border-gray-300 rounded-lg px-3 py-2 text-gray-800 focus:outline-none focus:ring-2 focus:ring-green-500"
-              rows={4}
-            />
+              rows={4} />
           )}
         </div>
 
-        {/* Botones guardar — solo si puede editar */}
-        {puedeEditar && (
-          <div className="flex flex-col sm:flex-row gap-3 pb-8">
+        {/* Botones guardar — solo si puede editar y no está aprobada */}
+        {puedeEditar && log?.estado !== 'aprobada' && (
+          <div className="flex gap-3 pb-8">
             <button onClick={() => guardarBitacora('borrador')} disabled={guardando}
               className="flex-1 flex items-center justify-center gap-2 border border-gray-300 text-gray-700 py-3 rounded-xl hover:bg-gray-50 transition disabled:opacity-50">
               <Save size={18} /> Guardar borrador
             </button>
             <button onClick={() => guardarBitacora('publicada')} disabled={guardando}
               className="flex-1 flex items-center justify-center gap-2 bg-green-700 text-white py-3 rounded-xl hover:bg-green-800 transition disabled:opacity-50">
-              <Send size={18} /> Publicar bitácora
+              <Send size={18} /> Publicar
             </button>
           </div>
         )}
+
       </main>
     </div>
   )
