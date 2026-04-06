@@ -2,11 +2,12 @@
 import { useState, useEffect } from 'react'
 import { createClient } from '../lib/supabase'
 import { useRouter } from 'next/navigation'
-import { Plus, FolderOpen, LogOut, HardHat, Trash2, AlertTriangle, X, Pencil, Check } from 'lucide-react'
+import { Plus, FolderOpen, LogOut, HardHat, Trash2, AlertTriangle, X, Pencil, Check, Eye } from 'lucide-react'
 
 export default function Dashboard() {
   const [profile, setProfile] = useState(null)
   const [projects, setProjects] = useState([])
+  const [rolesMap, setRolesMap] = useState({}) // { project_id: rol }
   const [showNewProject, setShowNewProject] = useState(false)
   const [newProject, setNewProject] = useState({ nombre: '', ubicacion: '', descripcion: '', fecha_inicio: '', fecha_fin_estimada: '' })
   const [loading, setLoading] = useState(true)
@@ -30,9 +31,9 @@ export default function Dashboard() {
     const { data: projs1 } = await supabase
       .from('projects').select('*').eq('org_id', prof.org_id)
 
-    // Proyectos donde es miembro invitado
+    // Membresías del usuario
     const { data: memberships } = await supabase
-      .from('project_members').select('project_id').eq('user_id', prof.id)
+      .from('project_members').select('project_id, rol').eq('user_id', prof.id)
 
     const projectIds = (memberships || []).map(m => m.project_id)
 
@@ -47,8 +48,31 @@ export default function Dashboard() {
       !(projs1 || []).find(p1 => p1.id === p.id)
     )]
     setProjects(todos.sort((a, b) => new Date(b.created_at) - new Date(a.created_at)))
+
+    // Construir mapa de roles por proyecto
+    const mapa = {}
+    for (const m of (memberships || [])) {
+      mapa[m.project_id] = m.rol
+    }
+    setRolesMap(mapa)
+
     setLoading(false)
   }
+
+  // Para un proyecto dado, ¿puede el usuario editarlo/borrarlo?
+  const puedeEditarProyecto = (p) => {
+    const rol = rolesMap[p.id]
+    // Si no está en membresías pero es de su org, es owner
+    if (!rol && p.org_id === profile?.org_id) return true
+    return rol === 'director'
+  }
+
+  const esClienteEnProyecto = (p) => {
+    return rolesMap[p.id] === 'cliente'
+  }
+
+  // ¿Puede crear proyectos nuevos? Solo si tiene org propia
+  const puedeCrearProyectos = !!profile?.org_id
 
   const crearProyecto = async (e) => {
     e.preventDefault()
@@ -59,7 +83,14 @@ export default function Dashboard() {
     if (newProject.fecha_fin_estimada) payload.fecha_fin_estimada = newProject.fecha_fin_estimada
     const { data: proj, error } = await supabase.from('projects').insert(payload).select().single()
     if (!error && proj) {
+      // Insertar al creador como director automáticamente
+      await supabase.from('project_members').insert({
+        project_id: proj.id,
+        user_id: profile.id,
+        rol: 'director'
+      })
       setProjects([proj, ...projects])
+      setRolesMap({ ...rolesMap, [proj.id]: 'director' })
       setShowNewProject(false)
       setNewProject({ nombre: '', ubicacion: '', descripcion: '', fecha_inicio: '', fecha_fin_estimada: '' })
     }
@@ -135,7 +166,7 @@ export default function Dashboard() {
               <h3 className="font-bold text-gray-800">Borrar proyecto</h3>
             </div>
             <p className="text-gray-600 text-sm mb-2">
-              Estas a punto de borrar <span className="font-semibold text-gray-800">"{confirmBorrar.nombre}"</span>.
+              Estás a punto de borrar <span className="font-semibold text-gray-800">"{confirmBorrar.nombre}"</span>.
             </p>
             <div className="bg-red-50 border border-red-200 rounded-lg px-4 py-3 mb-5">
               <p className="text-red-700 text-sm font-medium flex items-center gap-2">
@@ -186,14 +217,14 @@ export default function Dashboard() {
                 </select>
               </div>
               <div>
-                <label className="text-xs text-gray-500 mb-1 block">Ubicacion</label>
+                <label className="text-xs text-gray-500 mb-1 block">Ubicación</label>
                 <input type="text" placeholder="Opcional" value={editData.ubicacion}
                   onChange={(e) => setEditData({...editData, ubicacion: e.target.value})}
                   className="w-full border border-gray-300 rounded-lg px-4 py-2 text-gray-800 focus:outline-none focus:ring-2 focus:ring-green-500"
                 />
               </div>
               <div>
-                <label className="text-xs text-gray-500 mb-1 block">Descripcion</label>
+                <label className="text-xs text-gray-500 mb-1 block">Descripción</label>
                 <textarea placeholder="Opcional" value={editData.descripcion}
                   onChange={(e) => setEditData({...editData, descripcion: e.target.value})}
                   className="w-full border border-gray-300 rounded-lg px-4 py-2 text-gray-800 focus:outline-none focus:ring-2 focus:ring-green-500"
@@ -262,10 +293,12 @@ export default function Dashboard() {
       <main className="max-w-6xl mx-auto px-4 py-8">
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-2xl font-bold text-gray-800">Mis proyectos</h2>
-          <button onClick={() => setShowNewProject(true)}
-            className="flex items-center gap-2 bg-green-700 text-white px-4 py-2 rounded-lg hover:bg-green-800 transition">
-            <Plus size={18} /> Nuevo proyecto
-          </button>
+          {puedeCrearProyectos && (
+            <button onClick={() => setShowNewProject(true)}
+              className="flex items-center gap-2 bg-green-700 text-white px-4 py-2 rounded-lg hover:bg-green-800 transition">
+              <Plus size={18} /> Nuevo proyecto
+            </button>
+          )}
         </div>
 
         {showNewProject && (
@@ -283,12 +316,12 @@ export default function Dashboard() {
                   onChange={(e) => setNewProject({...newProject, nombre: e.target.value})}
                   className="w-full border border-gray-300 rounded-lg px-4 py-2 text-gray-800 focus:outline-none focus:ring-2 focus:ring-green-500"
                 />
-                <input type="text" placeholder="Ubicacion (opcional)"
+                <input type="text" placeholder="Ubicación (opcional)"
                   value={newProject.ubicacion}
                   onChange={(e) => setNewProject({...newProject, ubicacion: e.target.value})}
                   className="w-full border border-gray-300 rounded-lg px-4 py-2 text-gray-800 focus:outline-none focus:ring-2 focus:ring-green-500"
                 />
-                <textarea placeholder="Descripcion (opcional)"
+                <textarea placeholder="Descripción (opcional)"
                   value={newProject.descripcion}
                   onChange={(e) => setNewProject({...newProject, descripcion: e.target.value})}
                   className="w-full border border-gray-300 rounded-lg px-4 py-2 text-gray-800 focus:outline-none focus:ring-2 focus:ring-green-500"
@@ -334,13 +367,20 @@ export default function Dashboard() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {projects.map((p) => (
-              <div key={p.id} className="bg-white rounded-xl p-5 pb-14 shadow-sm border border-gray-100 relative">
+              <div key={p.id} className={`bg-white rounded-xl p-5 shadow-sm border border-gray-100 relative ${puedeEditarProyecto(p) ? 'pb-14' : 'pb-5'}`}>
                 <div onClick={() => router.push(`/dashboard/proyectos/${p.id}`)} className="cursor-pointer">
                   <div className="flex items-start justify-between mb-2">
                     <h3 className="font-bold text-gray-800 pr-4">{p.nombre}</h3>
-                    <span className={`text-xs px-2 py-1 rounded-full shrink-0 font-medium capitalize ${estadoBadge(p.estado)}`}>
-                      {p.estado}
-                    </span>
+                    <div className="flex items-center gap-1 shrink-0">
+                      {esClienteEnProyecto(p) && (
+                        <span className="text-xs bg-gray-100 text-gray-500 px-2 py-1 rounded-full flex items-center gap-1">
+                          <Eye size={10} /> Invitado
+                        </span>
+                      )}
+                      <span className={`text-xs px-2 py-1 rounded-full font-medium capitalize ${estadoBadge(p.estado)}`}>
+                        {p.estado}
+                      </span>
+                    </div>
                   </div>
                   {p.ubicacion && <p className="text-sm text-gray-500 mb-1">📍 {p.ubicacion}</p>}
                   {p.descripcion && <p className="text-sm text-gray-400 line-clamp-2">{p.descripcion}</p>}
@@ -350,20 +390,24 @@ export default function Dashboard() {
                     </p>
                   )}
                 </div>
-                <div className="absolute bottom-4 right-4 flex gap-2">
-                  <button
-                    onClick={(e) => { e.stopPropagation(); iniciarEdicion(p) }}
-                    className="flex items-center gap-1 text-blue-400 hover:text-blue-600 transition px-2 py-1 rounded-lg hover:bg-blue-50 border border-blue-200 hover:border-blue-400 text-xs"
-                  >
-                    <Pencil size={13} /> Editar
-                  </button>
-                  <button
-                    onClick={(e) => { e.stopPropagation(); setConfirmBorrar(p) }}
-                    className="flex items-center gap-1 text-red-400 hover:text-red-600 transition px-2 py-1 rounded-lg hover:bg-red-50 border border-red-200 hover:border-red-400 text-xs"
-                  >
-                    <Trash2 size={13} /> Borrar
-                  </button>
-                </div>
+
+                {/* Botones editar/borrar solo si puede editar ese proyecto */}
+                {puedeEditarProyecto(p) && (
+                  <div className="absolute bottom-4 right-4 flex gap-2">
+                    <button
+                      onClick={(e) => { e.stopPropagation(); iniciarEdicion(p) }}
+                      className="flex items-center gap-1 text-blue-400 hover:text-blue-600 transition px-2 py-1 rounded-lg hover:bg-blue-50 border border-blue-200 hover:border-blue-400 text-xs"
+                    >
+                      <Pencil size={13} /> Editar
+                    </button>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setConfirmBorrar(p) }}
+                      className="flex items-center gap-1 text-red-400 hover:text-red-600 transition px-2 py-1 rounded-lg hover:bg-red-50 border border-red-200 hover:border-red-400 text-xs"
+                    >
+                      <Trash2 size={13} /> Borrar
+                    </button>
+                  </div>
+                )}
               </div>
             ))}
           </div>
