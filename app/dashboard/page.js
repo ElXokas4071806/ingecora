@@ -25,8 +25,25 @@ export default function Dashboard() {
       .from('profiles').select('*, organizations(*)').eq('id', user.id).single()
     if (!prof) { setLoading(false); return }
     setProfile(prof)
-    const { data: projs } = await supabase
-      .from('projects').select('*').eq('org_id', prof.org_id).order('created_at', { ascending: false })
+    const { data: projs1 } = await supabase
+      .from('projects').select('*').eq('org_id', prof.org_id)
+    
+    const { data: memberships } = await supabase
+      .from('project_members').select('project_id').eq('user_id', prof.id)
+    
+    const projectIds = (memberships || []).map(m => m.project_id)
+    
+    let projs2 = []
+    if (projectIds.length > 0) {
+      const { data } = await supabase
+        .from('projects').select('*').in('id', projectIds)
+      projs2 = data || []
+    }
+
+    const todosLosProyectos = [...(projs1 || []), ...projs2.filter(p => 
+      !(projs1 || []).find(p1 => p1.id === p.id)
+    )]
+    setProjects(todosLosProyectos.sort((a, b) => new Date(b.created_at) - new Date(a.created_at)))
     setProjects(projs || [])
     setLoading(false)
   }
