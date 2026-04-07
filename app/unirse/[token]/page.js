@@ -1,11 +1,11 @@
 'use client'
 import { useState, useEffect } from 'react'
-import { createClient } from '@/lib/supabase'
+import { createClient } from '../../lib/supabase'
 import { useRouter, useParams } from 'next/navigation'
 import { HardHat, CheckCircle, XCircle } from 'lucide-react'
 
 export default function UnirsePage() {
-  const [estado, setEstado] = useState('cargando') // cargando | unido | error | ya_miembro
+  const [estado, setEstado] = useState('cargando')
   const [mensaje, setMensaje] = useState('')
   const [proyecto, setProyecto] = useState(null)
   const router = useRouter()
@@ -15,7 +15,6 @@ export default function UnirsePage() {
   useEffect(() => { procesarInvitacion() }, [token])
 
   const procesarInvitacion = async () => {
-    // 1. Buscar la invitación por token
     const { data: inv } = await supabase
       .from('project_invitations')
       .select('*')
@@ -29,21 +28,17 @@ export default function UnirsePage() {
       return
     }
 
-    // 2. Ver si hay sesión activa
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) {
-      // Guardar token en localStorage y redirigir al login
       localStorage.setItem('invitacion_token', token)
       router.push('/login')
       return
     }
 
-    // 3. Obtener el proyecto
     const { data: proy } = await supabase
       .from('projects').select('*').eq('id', inv.project_id).single()
     setProyecto(proy)
 
-    // 4. Ver si ya es miembro
     const { data: miembro } = await supabase
       .from('project_members')
       .select('*')
@@ -51,12 +46,8 @@ export default function UnirsePage() {
       .eq('user_id', user.id)
       .single()
 
-    if (miembro) {
-      setEstado('ya_miembro')
-      return
-    }
+    if (miembro) { setEstado('ya_miembro'); return }
 
-    // 5. Agregar como miembro con el rol del link
     const { error } = await supabase
       .from('project_members')
       .insert({ project_id: inv.project_id, user_id: user.id, rol: inv.rol })
