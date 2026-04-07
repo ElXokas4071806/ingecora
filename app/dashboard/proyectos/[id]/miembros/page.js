@@ -120,24 +120,33 @@ export default function MiembrosPage() {
     setCambiandoRol(null)
   }
 
-  const eliminarMiembro = async (miembro) => {
-    setErrorRol('')
+const eliminarMiembro = async (miembro) => {
+  setErrorRol('')
 
-    // No puede eliminarse a sí mismo si es el único director
-    if (miembro.user_id === miId && miembro.rol === 'director' && contarDirectores() <= 1) {
-      setErrorRol('No puedes eliminarte porque eres el único Director. Asigna otro Director primero.')
-      return
-    }
+  const confirmacion = confirm(
+    `Estás a punto de eliminar a "${miembro.profiles?.nombre}".\n\n` +
+    `Esta acción es irreversible.\n` +
+    `Todos los datos, bitácoras, fotos y actividades se perderán para siempre.\n\n` +
+    `¿Deseas continuar?`
+  )
 
-    // No puede dejar el proyecto sin director
-    if (miembro.rol === 'director' && contarDirectores() <= 1) {
-      setErrorRol('No puedes eliminar al único Director del proyecto.')
-      return
-    }
+  if (!confirmacion) return
 
-    await supabase.from('project_members').delete().eq('id', miembro.id)
-    setMiembros(miembros.filter(m => m.id !== miembro.id))
+  // No puede eliminarse a sí mismo si es el único director
+  if (miembro.user_id === miId && miembro.rol === 'director' && contarDirectores() <= 1) {
+    setErrorRol('No puedes eliminarte porque eres el único Director. Asigna otro Director primero.')
+    return
   }
+
+  // No puede dejar el proyecto sin director
+  if (miembro.rol === 'director' && contarDirectores() <= 1) {
+    setErrorRol('No puedes eliminar al único Director del proyecto.')
+    return
+  }
+
+  await supabase.from('project_members').delete().eq('id', miembro.id)
+  setMiembros(miembros.filter(m => m.id !== miembro.id))
+}
 
   const crearLinkInvitacion = async () => {
     const { data } = await supabase
