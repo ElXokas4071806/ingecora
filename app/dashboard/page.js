@@ -7,9 +7,9 @@ import { Plus, FolderOpen, LogOut, HardHat, Trash2, AlertTriangle, X, Pencil, Ch
 export default function Dashboard() {
   const [profile, setProfile] = useState(null)
   const [projects, setProjects] = useState([])
-  const [rolesMap, setRolesMap] = useState({}) // { project_id: rol }
+  const [rolesMap, setRolesMap] = useState({})
   const [showNewProject, setShowNewProject] = useState(false)
-  const [newProject, setNewProject] = useState({ nombre: '', ubicacion: '', descripcion: '', fecha_inicio: '', fecha_fin_estimada: '' })
+  const [newProject, setNewProject] = useState({ nombre: '', ubicacion: '', descripcion: '', fecha_inicio: '', fecha_fin_estimada: '', rol: 'director' })
   const [loading, setLoading] = useState(true)
   const [confirmBorrar, setConfirmBorrar] = useState(null)
   const [editando, setEditando] = useState(null)
@@ -27,11 +27,9 @@ export default function Dashboard() {
     if (!prof) { setLoading(false); return }
     setProfile(prof)
 
-    // Proyectos de su org
     const { data: projs1 } = await supabase
       .from('projects').select('*').eq('org_id', prof.org_id)
 
-    // Membresías del usuario
     const { data: memberships } = await supabase
       .from('project_members').select('project_id, rol').eq('user_id', prof.id)
 
@@ -49,7 +47,6 @@ export default function Dashboard() {
     )]
     setProjects(todos.sort((a, b) => new Date(b.created_at) - new Date(a.created_at)))
 
-    // Construir mapa de roles por proyecto
     const mapa = {}
     for (const m of (memberships || [])) {
       mapa[m.project_id] = m.rol
@@ -59,10 +56,16 @@ export default function Dashboard() {
     setLoading(false)
   }
 
-  // Para un proyecto dado, ¿puede el usuario editarlo/borrarlo?
+  // Director y owner pueden editar. Residente también puede editar pero NO borrar.
   const puedeEditarProyecto = (p) => {
     const rol = rolesMap[p.id]
-    // Si no está en membresías pero es de su org, es owner
+    if (!rol && p.org_id === profile?.org_id) return true
+    return rol === 'director' || rol === 'residente'
+  }
+
+  // Solo director y owner pueden borrar
+  const puedeBorrarProyecto = (p) => {
+    const rol = rolesMap[p.id]
     if (!rol && p.org_id === profile?.org_id) return true
     return rol === 'director'
   }
@@ -71,7 +74,6 @@ export default function Dashboard() {
     return rolesMap[p.id] === 'cliente'
   }
 
-  // ¿Puede crear proyectos nuevos? Solo si tiene org propia
   const puedeCrearProyectos = !!profile?.org_id
 
   const crearProyecto = async (e) => {
@@ -83,16 +85,15 @@ export default function Dashboard() {
     if (newProject.fecha_fin_estimada) payload.fecha_fin_estimada = newProject.fecha_fin_estimada
     const { data: proj, error } = await supabase.from('projects').insert(payload).select().single()
     if (!error && proj) {
-      // Insertar al creador como director automáticamente
       await supabase.from('project_members').insert({
         project_id: proj.id,
         user_id: profile.id,
-        rol: 'director'
+        rol: newProject.rol
       })
       setProjects([proj, ...projects])
-      setRolesMap({ ...rolesMap, [proj.id]: 'director' })
+      setRolesMap({ ...rolesMap, [proj.id]: newProject.rol })
       setShowNewProject(false)
-      setNewProject({ nombre: '', ubicacion: '', descripcion: '', fecha_inicio: '', fecha_fin_estimada: '' })
+      setNewProject({ nombre: '', ubicacion: '', descripcion: '', fecha_inicio: '', fecha_fin_estimada: '', rol: 'director' })
     }
   }
 
@@ -343,6 +344,30 @@ export default function Dashboard() {
                     />
                   </div>
                 </div>
+
+                {/* Selector de rol */}
+                <div>
+                  <label className="text-xs text-gray-500 mb-2 block">Tu rol en este proyecto</label>
+                  <div className="flex gap-3">
+                    {[
+                      { value: 'director', label: '🧑‍💼 Director' },
+                      { value: 'residente', label: '👷 Residente' }
+                    ].map((r) => (
+                      <button
+                        key={r.value}
+                        type="button"
+                        onClick={() => setNewProject({ ...newProject, rol: r.value })}
+                        className={`flex-1 py-2 rounded-lg border text-sm font-medium transition
+                          ${newProject.rol === r.value
+                            ? 'bg-green-700 text-white border-green-700'
+                            : 'border-gray-300 text-gray-600 hover:bg-gray-50'}`}
+                      >
+                        {r.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
                 <div className="flex gap-3 pt-2">
                   <button type="button" onClick={() => setShowNewProject(false)}
                     className="flex-1 border border-gray-300 text-gray-700 py-2 rounded-lg hover:bg-gray-50">
@@ -391,7 +416,7 @@ export default function Dashboard() {
                   )}
                 </div>
 
-                {/* Botones editar/borrar solo si puede editar ese proyecto */}
+                {/* Botones: Editar lo ven director y residente, Borrar solo director */}
                 {puedeEditarProyecto(p) && (
                   <div className="absolute bottom-4 right-4 flex gap-2">
                     <button
@@ -400,12 +425,14 @@ export default function Dashboard() {
                     >
                       <Pencil size={13} /> Editar
                     </button>
-                    <button
-                      onClick={(e) => { e.stopPropagation(); setConfirmBorrar(p) }}
-                      className="flex items-center gap-1 text-red-400 hover:text-red-600 transition px-2 py-1 rounded-lg hover:bg-red-50 border border-red-200 hover:border-red-400 text-xs"
-                    >
-                      <Trash2 size={13} /> Borrar
-                    </button>
+                    {puedeBorrarProyecto(p) && (
+                      <button
+                        onClick={(e) => { e.stopPropagation(); setConfirmBorrar(p) }}
+                        className="flex items-center gap-1 text-red-400 hover:text-red-600 transition px-2 py-1 rounded-lg hover:bg-red-50 border border-red-200 hover:border-red-400 text-xs"
+                      >
+                        <Trash2 size={13} /> Borrar
+                      </button>
+                    )}
                   </div>
                 )}
               </div>
