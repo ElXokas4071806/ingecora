@@ -22,6 +22,7 @@ export default function MiembrosPage() {
   const [miRol, setMiRol] = useState(null)
   const [miId, setMiId] = useState(null)
   const [confirmEliminar, setConfirmEliminar] = useState(null) // miembro a eliminar
+  const [rolLink, setRolLink] = useState('cliente')
   const router = useRouter()
   const pathname = usePathname()
   const supabase = createClient()
@@ -143,11 +144,11 @@ export default function MiembrosPage() {
   }
 
   const crearLinkInvitacion = async () => {
-    const { data } = await supabase
-      .from('project_invitations')
-      .insert({ project_id: proyectoId, rol: 'cliente' })
-      .select().single()
-    if (data) setInvitaciones([...invitaciones, data])
+  const { data } = await supabase
+    .from('project_invitations')
+    .insert({ project_id: proyectoId, rol: rolLink })
+    .select().single()
+  if (data) setInvitaciones([...invitaciones, data])
   }
 
   const copiarLink = async (token) => {
@@ -291,10 +292,24 @@ export default function MiembrosPage() {
             <p className="text-sm text-gray-500 mb-4">Genera un link para que clientes accedan en modo solo lectura sin necesidad de registro.</p>
 
             {invitaciones.length === 0 ? (
-              <button onClick={crearLinkInvitacion}
-                className="w-full border border-dashed border-gray-300 text-gray-600 py-3 rounded-xl hover:bg-gray-50 transition text-sm flex items-center justify-center gap-2">
-                <Link size={16} /> Generar link de invitación
-              </button>
+  <div className="space-y-3">
+    <div>
+      <label className="text-xs text-gray-500 mb-1 block">Rol del invitado</label>
+      <select
+        value={rolLink}
+        onChange={(e) => setRolLink(e.target.value)}
+        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-green-500"
+      >
+        <option value="cliente">Cliente (solo lectura)</option>
+        <option value="residente">Residente</option>
+        <option value="director">Director</option>
+      </select>
+    </div>
+    <button onClick={crearLinkInvitacion}
+      className="w-full border border-dashed border-gray-300 text-gray-600 py-3 rounded-xl hover:bg-gray-50 transition text-sm flex items-center justify-center gap-2">
+      <Link size={16} /> Generar link de invitación
+    </button>
+  </div>
             ) : (
               <div className="space-y-3">
                 {invitaciones.map((inv) => (
