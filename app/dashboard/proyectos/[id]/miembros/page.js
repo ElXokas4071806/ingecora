@@ -17,6 +17,7 @@ export default function MiembrosPage() {
   const [errorBusqueda, setErrorBusqueda] = useState('')
   const [linkCopiado, setLinkCopiado] = useState(false)
   const [agregando, setAgregando] = useState(false)
+  const [cambiandoRol, setCambiandoRol] = useState(null)
   const router = useRouter()
   const pathname = usePathname()
   const supabase = createClient()
@@ -84,6 +85,13 @@ export default function MiembrosPage() {
     setAgregando(false)
   }
 
+  const cambiarRol = async (miembroId, nuevoRol) => {
+    setCambiandoRol(miembroId)
+    await supabase.from('project_members').update({ rol: nuevoRol }).eq('id', miembroId)
+    setMiembros(miembros.map(m => m.id === miembroId ? { ...m, rol: nuevoRol } : m))
+    setCambiandoRol(null)
+  }
+
   const eliminarMiembro = async (id) => {
     await supabase.from('project_members').delete().eq('id', id)
     setMiembros(miembros.filter(m => m.id !== id))
@@ -107,6 +115,15 @@ export default function MiembrosPage() {
   const desactivarLink = async (id) => {
     await supabase.from('project_invitations').update({ activo: false }).eq('id', id)
     setInvitaciones(invitaciones.filter(i => i.id !== id))
+  }
+
+  const rolLabel = (rol) => {
+    switch(rol) {
+      case 'director': return 'Director'
+      case 'residente': return 'Residente'
+      case 'cliente': return 'Cliente'
+      default: return rol
+    }
   }
 
   const rolColor = (rol) => {
@@ -173,9 +190,9 @@ export default function MiembrosPage() {
                   onChange={(e) => setRolSeleccionado(e.target.value)}
                   className="flex-1 border border-gray-300 rounded-lg px-3 py-1.5 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-green-500"
                 >
-                  <option value="director">Director de obra</option>
-                  <option value="residente">Residente de obra</option>
-                  <option value="cliente">Cliente / Interventor (solo lectura)</option>
+                  <option value="director">Director</option>
+                  <option value="residente">Residente</option>
+                  <option value="cliente">Cliente (solo lectura)</option>
                 </select>
                 <button onClick={agregarMiembro} disabled={agregando}
                   className="bg-green-700 text-white px-4 py-1.5 rounded-lg text-sm hover:bg-green-800 transition disabled:opacity-50">
@@ -238,15 +255,22 @@ export default function MiembrosPage() {
           ) : (
             <div className="space-y-2">
               {miembros.map((m) => (
-                <div key={m.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                  <div>
-                    <p className="text-sm font-medium text-gray-800">{m.profiles?.nombre}</p>
-                    <p className="text-xs text-gray-500">{m.profiles?.email}</p>
+                <div key={m.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg gap-2">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-gray-800 truncate">{m.profiles?.nombre}</p>
+                    <p className="text-xs text-gray-500 truncate">{m.profiles?.email}</p>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <span className={`text-xs px-2 py-1 rounded-full font-medium ${rolColor(m.rol)}`}>
-                      {m.rol}
-                    </span>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <select
+                      value={m.rol}
+                      onChange={(e) => cambiarRol(m.id, e.target.value)}
+                      disabled={cambiandoRol === m.id}
+                      className={`border border-gray-300 rounded-lg px-2 py-1 text-xs text-gray-800 focus:outline-none focus:ring-2 focus:ring-green-500 ${rolColor(m.rol)}`}
+                    >
+                      <option value="director">Director</option>
+                      <option value="residente">Residente</option>
+                      <option value="cliente">Cliente</option>
+                    </select>
                     <button onClick={() => eliminarMiembro(m.id)}
                       className="text-red-400 hover:text-red-600 p-1 rounded hover:bg-red-50 transition">
                       <Trash2 size={14} />
