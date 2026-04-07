@@ -21,6 +21,7 @@ export default function MiembrosPage() {
   const [errorRol, setErrorRol] = useState('')
   const [miRol, setMiRol] = useState(null)
   const [miId, setMiId] = useState(null)
+  const [confirmEliminar, setConfirmEliminar] = useState(null) // miembro a eliminar
   const router = useRouter()
   const pathname = usePathname()
   const supabase = createClient()
@@ -45,7 +46,6 @@ export default function MiembrosPage() {
       .eq('project_id', id)
     setMiembros(mbs || [])
 
-    // Determinar mi rol en este proyecto
     const miMembership = (mbs || []).find(m => m.user_id === user?.id)
     setMiRol(miMembership?.rol || null)
 
@@ -100,13 +100,11 @@ export default function MiembrosPage() {
   const cambiarRol = async (miembro, nuevoRol) => {
     setErrorRol('')
 
-    // Regla 1: El director no puede auto-degradarse
     if (miembro.user_id === miId && nuevoRol !== 'director') {
       setErrorRol('No puedes cambiar tu propio rol de Director.')
       return
     }
 
-    // Regla 2: Debe quedar al menos un director
     if (miembro.rol === 'director' && nuevoRol !== 'director') {
       if (contarDirectores() <= 1) {
         setErrorRol('Debe haber al menos un Director en el proyecto. Asigna otro Director antes de cambiar este rol.')
@@ -120,23 +118,28 @@ export default function MiembrosPage() {
     setCambiandoRol(null)
   }
 
-  const eliminarMiembro = async (miembro) => {
+  // Validar antes de mostrar el modal
+  const solicitarEliminar = (miembro) => {
     setErrorRol('')
 
-    // No puede eliminarse a sí mismo si es el único director
     if (miembro.user_id === miId && miembro.rol === 'director' && contarDirectores() <= 1) {
       setErrorRol('No puedes eliminarte porque eres el único Director. Asigna otro Director primero.')
       return
     }
 
-    // No puede dejar el proyecto sin director
     if (miembro.rol === 'director' && contarDirectores() <= 1) {
       setErrorRol('No puedes eliminar al único Director del proyecto.')
       return
     }
 
-    await supabase.from('project_members').delete().eq('id', miembro.id)
-    setMiembros(miembros.filter(m => m.id !== miembro.id))
+    setConfirmEliminar(miembro)
+  }
+
+  const confirmarEliminar = async () => {
+    if (!confirmEliminar) return
+    await supabase.from('project_members').delete().eq('id', confirmEliminar.id)
+    setMiembros(miembros.filter(m => m.id !== confirmEliminar.id))
+    setConfirmEliminar(null)
   }
 
   const crearLinkInvitacion = async () => {
@@ -175,6 +178,42 @@ export default function MiembrosPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
+
+      {/* Modal confirmación eliminar miembro */}
+      {confirmEliminar && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl p-6 w-full max-w-sm shadow-xl">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="bg-red-100 p-2 rounded-full">
+                <AlertTriangle className="text-red-600" size={22} />
+              </div>
+              <h3 className="font-bold text-gray-800">Eliminar miembro</h3>
+            </div>
+            <p className="text-gray-600 text-sm mb-2">
+              Estás a punto de eliminar a{' '}
+              <span className="font-semibold text-gray-800">{confirmEliminar.profiles?.nombre}</span>{' '}
+              del proyecto.
+            </p>
+            <div className="bg-red-50 border border-red-200 rounded-lg px-4 py-3 mb-5">
+              <p className="text-red-700 text-sm font-medium flex items-center gap-2">
+                <AlertTriangle size={14} className="shrink-0" />
+                Este usuario perderá acceso inmediato al proyecto y no podrá ver bitácoras, fotos ni informes.
+              </p>
+            </div>
+            <div className="flex gap-3">
+              <button onClick={() => setConfirmEliminar(null)}
+                className="flex-1 border border-gray-300 text-gray-700 py-2.5 rounded-xl hover:bg-gray-50 transition font-medium">
+                Cancelar
+              </button>
+              <button onClick={confirmarEliminar}
+                className="flex-1 bg-red-600 text-white py-2.5 rounded-xl hover:bg-red-700 transition font-medium">
+                Sí, eliminar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <header className="bg-white shadow-[0_2px_4px_rgba(0,0,0,0.08)]">
         <div className="max-w-3xl mx-auto px-4 py-4 flex items-center gap-3">
           <button onClick={() => router.push(`/dashboard/proyectos/${proyectoId}`)} className="text-gray-500 hover:text-gray-800">
@@ -189,14 +228,12 @@ export default function MiembrosPage() {
 
       <main className="max-w-3xl mx-auto px-4 py-6 space-y-6">
 
-        {/* Aviso si es residente */}
         {!esDirector && (
           <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3">
             <p className="text-sm text-blue-700">Solo el Director puede gestionar miembros. Tienes acceso de solo lectura a esta sección.</p>
           </div>
         )}
 
-        {/* Agregar por correo — solo director */}
         {esDirector && (
           <div className="bg-white rounded-xl p-5 shadow-sm">
             <div className="flex items-center gap-2 mb-4">
@@ -245,7 +282,6 @@ export default function MiembrosPage() {
           </div>
         )}
 
-        {/* Link de invitación — solo director */}
         {esDirector && (
           <div className="bg-white rounded-xl p-5 shadow-sm">
             <div className="flex items-center gap-2 mb-4">
@@ -288,7 +324,6 @@ export default function MiembrosPage() {
           </div>
         )}
 
-        {/* Error de rol */}
         {errorRol && (
           <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 flex items-start gap-2">
             <AlertTriangle size={16} className="text-red-500 shrink-0 mt-0.5" />
@@ -296,7 +331,6 @@ export default function MiembrosPage() {
           </div>
         )}
 
-        {/* Lista de miembros */}
         <div className="bg-white rounded-xl p-5 shadow-sm">
           <div className="flex items-center gap-2 mb-4">
             <Users size={18} className="text-green-700" />
@@ -330,7 +364,7 @@ export default function MiembrosPage() {
                       </span>
                     )}
                     {esDirector && (
-                      <button onClick={() => eliminarMiembro(m)}
+                      <button onClick={() => solicitarEliminar(m)}
                         className="text-red-400 hover:text-red-600 p-1 rounded hover:bg-red-50 transition">
                         <Trash2 size={14} />
                       </button>
