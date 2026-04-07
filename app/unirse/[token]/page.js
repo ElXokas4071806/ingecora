@@ -1,6 +1,6 @@
 'use client'
 import { useState, useEffect } from 'react'
-import { createClient } from '../../../lib/supabase'
+import { createClient } from '@/lib/supabase'
 import { useRouter, useParams } from 'next/navigation'
 import { HardHat, CheckCircle, XCircle } from 'lucide-react'
 
