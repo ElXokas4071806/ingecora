@@ -21,6 +21,11 @@ export default function MiembrosPage() {
   const [errorRol, setErrorRol] = useState('')
   const [miRol, setMiRol] = useState(null)
   const [miId, setMiId] = useState(null)
+
+  // 🔥 NUEVO (modal)
+  const [miembroAEliminar, setMiembroAEliminar] = useState(null)
+  const [mostrarModal, setMostrarModal] = useState(false)
+
   const router = useRouter()
   const pathname = usePathname()
   const supabase = createClient()
@@ -45,7 +50,6 @@ export default function MiembrosPage() {
       .eq('project_id', id)
     setMiembros(mbs || [])
 
-    // Determinar mi rol en este proyecto
     const miMembership = (mbs || []).find(m => m.user_id === user?.id)
     setMiRol(miMembership?.rol || null)
 
@@ -59,57 +63,17 @@ export default function MiembrosPage() {
 
   const contarDirectores = () => miembros.filter(m => m.rol === 'director').length
 
-  const buscarUsuario = async () => {
-    if (!busquedaEmail) return
-    setBuscando(true)
-    setErrorBusqueda('')
-    setUsuarioEncontrado(null)
-
-    const { data: perfil } = await supabase
-      .from('profiles').select('*').eq('email', busquedaEmail).single()
-
-    if (!perfil) {
-      setErrorBusqueda('No se encontró ningún usuario con ese correo. Debe estar registrado en Ingecora.')
-    } else {
-      const yaEsMiembro = miembros.find(m => m.user_id === perfil.id)
-      if (yaEsMiembro) {
-        setErrorBusqueda('Este usuario ya es miembro del proyecto.')
-      } else {
-        setUsuarioEncontrado(perfil)
-      }
-    }
-    setBuscando(false)
-  }
-
-  const agregarMiembro = async () => {
-    if (!usuarioEncontrado) return
-    setAgregando(true)
-    const { data, error } = await supabase
-      .from('project_members')
-      .insert({ project_id: proyectoId, user_id: usuarioEncontrado.id, rol: rolSeleccionado })
-      .select('*, profiles(nombre, email)').single()
-
-    if (!error && data) {
-      setMiembros([...miembros, data])
-      setUsuarioEncontrado(null)
-      setBusquedaEmail('')
-    }
-    setAgregando(false)
-  }
-
   const cambiarRol = async (miembro, nuevoRol) => {
     setErrorRol('')
 
-    // Regla 1: El director no puede auto-degradarse
     if (miembro.user_id === miId && nuevoRol !== 'director') {
       setErrorRol('No puedes cambiar tu propio rol de Director.')
       return
     }
 
-    // Regla 2: Debe quedar al menos un director
     if (miembro.rol === 'director' && nuevoRol !== 'director') {
       if (contarDirectores() <= 1) {
-        setErrorRol('Debe haber al menos un Director en el proyecto. Asigna otro Director antes de cambiar este rol.')
+        setErrorRol('Debe haber al menos un Director.')
         return
       }
     }
@@ -120,52 +84,26 @@ export default function MiembrosPage() {
     setCambiandoRol(null)
   }
 
-const eliminarMiembro = async (miembro) => {
-  setErrorRol('')
+  // 🔥 NUEVO: confirmar eliminación
+  const confirmarEliminacion = async () => {
+    const miembro = miembroAEliminar
+    if (!miembro) return
 
-  const confirmacion = confirm(
-    `Estás a punto de eliminar a "${miembro.profiles?.nombre}".\n\n` +
-    `Esta acción es irreversible.\n` +
-    `Todos los datos, bitácoras, fotos y actividades se perderán para siempre.\n\n` +
-    `¿Deseas continuar?`
-  )
+    if (miembro.user_id === miId && miembro.rol === 'director' && contarDirectores() <= 1) {
+      setErrorRol('No puedes eliminarte porque eres el único Director.')
+      return
+    }
 
-  if (!confirmacion) return
+    if (miembro.rol === 'director' && contarDirectores() <= 1) {
+      setErrorRol('No puedes eliminar al único Director.')
+      return
+    }
 
-  // No puede eliminarse a sí mismo si es el único director
-  if (miembro.user_id === miId && miembro.rol === 'director' && contarDirectores() <= 1) {
-    setErrorRol('No puedes eliminarte porque eres el único Director. Asigna otro Director primero.')
-    return
-  }
+    await supabase.from('project_members').delete().eq('id', miembro.id)
+    setMiembros(miembros.filter(m => m.id !== miembro.id))
 
-  // No puede dejar el proyecto sin director
-  if (miembro.rol === 'director' && contarDirectores() <= 1) {
-    setErrorRol('No puedes eliminar al único Director del proyecto.')
-    return
-  }
-
-  await supabase.from('project_members').delete().eq('id', miembro.id)
-  setMiembros(miembros.filter(m => m.id !== miembro.id))
-}
-
-  const crearLinkInvitacion = async () => {
-    const { data } = await supabase
-      .from('project_invitations')
-      .insert({ project_id: proyectoId, rol: 'cliente' })
-      .select().single()
-    if (data) setInvitaciones([...invitaciones, data])
-  }
-
-  const copiarLink = async (token) => {
-    const link = `${window.location.origin}/unirse/${token}`
-    await navigator.clipboard.writeText(link)
-    setLinkCopiado(true)
-    setTimeout(() => setLinkCopiado(false), 2000)
-  }
-
-  const desactivarLink = async (id) => {
-    await supabase.from('project_invitations').update({ activo: false }).eq('id', id)
-    setInvitaciones(invitaciones.filter(i => i.id !== id))
+    setMostrarModal(false)
+    setMiembroAEliminar(null)
   }
 
   const rolColor = (rol) => {
@@ -176,181 +114,106 @@ const eliminarMiembro = async (miembro) => {
 
   const esDirector = miRol === 'director'
 
-  if (loading) return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-      <p className="text-gray-500">Cargando...</p>
-    </div>
-  )
+  if (loading) return <div className="min-h-screen flex items-center justify-center">Cargando...</div>
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <header className="bg-white shadow-[0_2px_4px_rgba(0,0,0,0.08)]">
-        <div className="max-w-3xl mx-auto px-4 py-4 flex items-center gap-3">
-          <button onClick={() => router.push(`/dashboard/proyectos/${proyectoId}`)} className="text-gray-500 hover:text-gray-800">
-            <ArrowLeft size={20} />
-          </button>
-          <div>
-            <h1 className="text-xl font-bold text-gray-800">Miembros</h1>
-            <p className="text-xs text-gray-500">{proyecto?.nombre}</p>
-          </div>
-        </div>
-      </header>
 
-      <main className="max-w-3xl mx-auto px-4 py-6 space-y-6">
+      <main className="max-w-3xl mx-auto p-6">
 
-        {/* Aviso si es residente */}
-        {!esDirector && (
-          <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3">
-            <p className="text-sm text-blue-700">Solo el Director puede gestionar miembros. Tienes acceso de solo lectura a esta sección.</p>
-          </div>
-        )}
+        {errorRol && <p className="text-red-500 mb-4">{errorRol}</p>}
 
-        {/* Agregar por correo — solo director */}
-        {esDirector && (
-          <div className="bg-white rounded-xl p-5 shadow-sm">
-            <div className="flex items-center gap-2 mb-4">
-              <UserPlus size={18} className="text-green-700" />
-              <h2 className="font-bold text-gray-800">Agregar por correo</h2>
-            </div>
-            <p className="text-sm text-gray-500 mb-4">El usuario debe estar registrado en Ingecora.</p>
-            <div className="flex gap-2 mb-3">
-              <input
-                type="email"
-                placeholder="correo@ejemplo.com"
-                value={busquedaEmail}
-                onChange={(e) => setBusquedaEmail(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && buscarUsuario()}
-                className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-gray-800 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
-              />
-              <button onClick={buscarUsuario} disabled={buscando}
-                className="bg-green-700 text-white px-4 py-2 rounded-lg text-sm hover:bg-green-800 transition disabled:opacity-50">
-                {buscando ? '...' : 'Buscar'}
-              </button>
-            </div>
+        <div className="bg-white rounded-xl p-5 shadow-sm">
+          <h2 className="font-bold mb-4">Miembros</h2>
 
-            {errorBusqueda && <p className="text-red-500 text-sm mb-3">{errorBusqueda}</p>}
+          {miembros.map((m) => (
+            <div key={m.id} className="flex justify-between items-center p-3 bg-gray-50 rounded-lg mb-2">
+              <div>
+                <p className="text-sm font-medium">{m.profiles?.nombre}</p>
+                <p className="text-xs text-gray-500">{m.profiles?.email}</p>
+              </div>
 
-            {usuarioEncontrado && (
-              <div className="border border-green-200 bg-green-50 rounded-lg p-3 mb-3">
-                <p className="text-sm font-medium text-gray-800">{usuarioEncontrado.nombre}</p>
-                <p className="text-xs text-gray-500 mb-3">{usuarioEncontrado.email}</p>
-                <div className="flex gap-2 items-center">
+              <div className="flex items-center gap-2">
+                {esDirector ? (
                   <select
-                    value={rolSeleccionado}
-                    onChange={(e) => setRolSeleccionado(e.target.value)}
-                    className="flex-1 border border-gray-300 rounded-lg px-3 py-1.5 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-green-500"
+                    value={m.rol}
+                    onChange={(e) => cambiarRol(m, e.target.value)}
+                    className={`text-xs px-2 py-1 rounded ${rolColor(m.rol)}`}
                   >
                     <option value="director">Director</option>
                     <option value="residente">Residente</option>
-                    <option value="cliente">Cliente (solo lectura)</option>
+                    <option value="cliente">Cliente</option>
                   </select>
-                  <button onClick={agregarMiembro} disabled={agregando}
-                    className="bg-green-700 text-white px-4 py-1.5 rounded-lg text-sm hover:bg-green-800 transition disabled:opacity-50">
-                    {agregando ? '...' : 'Agregar'}
+                ) : (
+                  <span className={`text-xs px-2 py-1 rounded ${rolColor(m.rol)}`}>
+                    {m.rol}
+                  </span>
+                )}
+
+                {esDirector && (
+                  <button
+                    onClick={() => {
+                      setMiembroAEliminar(m)
+                      setMostrarModal(true)
+                    }}
+                    className="text-red-400 hover:text-red-600"
+                  >
+                    <Trash2 size={14} />
                   </button>
-                </div>
+                )}
               </div>
-            )}
-          </div>
-        )}
-
-        {/* Link de invitación — solo director */}
-        {esDirector && (
-          <div className="bg-white rounded-xl p-5 shadow-sm">
-            <div className="flex items-center gap-2 mb-4">
-              <Link size={18} className="text-green-700" />
-              <h2 className="font-bold text-gray-800">Link de invitación</h2>
             </div>
-            <p className="text-sm text-gray-500 mb-4">Genera un link para que clientes accedan en modo solo lectura sin necesidad de registro.</p>
-
-            {invitaciones.length === 0 ? (
-              <button onClick={crearLinkInvitacion}
-                className="w-full border border-dashed border-gray-300 text-gray-600 py-3 rounded-xl hover:bg-gray-50 transition text-sm flex items-center justify-center gap-2">
-                <Link size={16} /> Generar link de invitación
-              </button>
-            ) : (
-              <div className="space-y-3">
-                {invitaciones.map((inv) => (
-                  <div key={inv.id} className="border border-gray-200 rounded-lg p-3 flex items-center justify-between gap-2">
-                    <p className="text-xs text-gray-500 truncate flex-1">
-                      {`${window.location.origin}/unirse/${inv.token}`}
-                    </p>
-                    <div className="flex gap-2 shrink-0">
-                      <button onClick={() => copiarLink(inv.token)}
-                        className="flex items-center gap-1 bg-green-700 text-white px-3 py-1.5 rounded-lg text-xs hover:bg-green-800 transition">
-                        {linkCopiado ? <Check size={13} /> : <Copy size={13} />}
-                        {linkCopiado ? 'Copiado' : 'Copiar'}
-                      </button>
-                      <button onClick={() => desactivarLink(inv.id)}
-                        className="text-red-400 hover:text-red-600 p-1.5 rounded-lg hover:bg-red-50 border border-red-200 transition">
-                        <Trash2 size={13} />
-                      </button>
-                    </div>
-                  </div>
-                ))}
-                <button onClick={crearLinkInvitacion}
-                  className="text-sm text-green-700 hover:underline">
-                  + Generar otro link
-                </button>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Error de rol */}
-        {errorRol && (
-          <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 flex items-start gap-2">
-            <AlertTriangle size={16} className="text-red-500 shrink-0 mt-0.5" />
-            <p className="text-sm text-red-700">{errorRol}</p>
-          </div>
-        )}
-
-        {/* Lista de miembros */}
-        <div className="bg-white rounded-xl p-5 shadow-sm">
-          <div className="flex items-center gap-2 mb-4">
-            <Users size={18} className="text-green-700" />
-            <h2 className="font-bold text-gray-800">Miembros del proyecto</h2>
-          </div>
-          {miembros.length === 0 ? (
-            <p className="text-sm text-gray-400 text-center py-4">No hay miembros agregados aún</p>
-          ) : (
-            <div className="space-y-2">
-              {miembros.map((m) => (
-                <div key={m.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg gap-2">
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-gray-800 truncate">{m.profiles?.nombre}</p>
-                    <p className="text-xs text-gray-500 truncate">{m.profiles?.email}</p>
-                  </div>
-                  <div className="flex items-center gap-2 shrink-0">
-                    {esDirector ? (
-                      <select
-                        value={m.rol}
-                        onChange={(e) => cambiarRol(m, e.target.value)}
-                        disabled={cambiandoRol === m.id}
-                        className={`border rounded-lg px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-green-500 ${rolColor(m.rol)}`}
-                      >
-                        <option value="director">Director</option>
-                        <option value="residente">Residente</option>
-                        <option value="cliente">Cliente</option>
-                      </select>
-                    ) : (
-                      <span className={`text-xs px-2 py-1 rounded-full font-medium ${rolColor(m.rol)}`}>
-                        {m.rol.charAt(0).toUpperCase() + m.rol.slice(1)}
-                      </span>
-                    )}
-                    {esDirector && (
-                      <button onClick={() => eliminarMiembro(m)}
-                        className="text-red-400 hover:text-red-600 p-1 rounded hover:bg-red-50 transition">
-                        <Trash2 size={14} />
-                      </button>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
+          ))}
         </div>
       </main>
+
+      {/* 🔥 MODAL */}
+      {mostrarModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-2xl w-full max-w-md p-6 shadow-xl">
+
+            <div className="flex items-center gap-3 mb-4">
+              <div className="bg-red-100 text-red-600 p-2 rounded-full">
+                <AlertTriangle size={20} />
+              </div>
+              <h2 className="text-lg font-bold text-gray-800">
+                Borrar miembro
+              </h2>
+            </div>
+
+            <p className="text-sm text-gray-700 mb-4">
+              Estás a punto de eliminar a{" "}
+              <span className="font-semibold">
+                "{miembroAEliminar?.profiles?.nombre}"
+              </span>.
+            </p>
+
+            <div className="border border-red-200 bg-red-50 rounded-xl p-3 mb-6">
+              <p className="text-sm text-red-600">
+                Esta acción es irreversible. Este usuario perderá acceso al proyecto y a toda su información.
+              </p>
+            </div>
+
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => setMostrarModal(false)}
+                className="px-4 py-2 rounded-lg border text-gray-600 hover:bg-gray-50"
+              >
+                Cancelar
+              </button>
+
+              <button
+                onClick={confirmarEliminacion}
+                className="px-4 py-2 rounded-lg bg-red-600 text-white hover:bg-red-700"
+              >
+                Sí, borrar
+              </button>
+            </div>
+
+          </div>
+        </div>
+      )}
+
     </div>
   )
 }
