@@ -2,12 +2,11 @@
 import { useState, useEffect } from 'react'
 import { createClient } from '../../../../lib/supabase'
 import { useRouter, usePathname } from 'next/navigation'
-import { ArrowLeft, UserPlus, Link, Trash2, Copy, Check, Users, AlertTriangle } from 'lucide-react'
+import { ArrowLeft, UserPlus, Trash2, Users, AlertTriangle } from 'lucide-react'
 
 export default function MiembrosPage() {
   const [proyecto, setProyecto] = useState(null)
   const [miembros, setMiembros] = useState([])
-  const [invitaciones, setInvitaciones] = useState([])
   const [loading, setLoading] = useState(true)
   const [proyectoId, setProyectoId] = useState(null)
   const [busquedaEmail, setBusquedaEmail] = useState('')
@@ -15,14 +14,12 @@ export default function MiembrosPage() {
   const [rolSeleccionado, setRolSeleccionado] = useState('residente')
   const [buscando, setBuscando] = useState(false)
   const [errorBusqueda, setErrorBusqueda] = useState('')
-  const [linkCopiado, setLinkCopiado] = useState(false)
   const [agregando, setAgregando] = useState(false)
   const [cambiandoRol, setCambiandoRol] = useState(null)
   const [errorRol, setErrorRol] = useState('')
   const [miRol, setMiRol] = useState(null)
   const [miId, setMiId] = useState(null)
-  const [confirmEliminar, setConfirmEliminar] = useState(null) // miembro a eliminar
-  const [rolLink, setRolLink] = useState('cliente')
+  const [confirmEliminar, setConfirmEliminar] = useState(null)
   const router = useRouter()
   const pathname = usePathname()
   const supabase = createClient()
@@ -49,11 +46,6 @@ export default function MiembrosPage() {
 
     const miMembership = (mbs || []).find(m => m.user_id === user?.id)
     setMiRol(miMembership?.rol || null)
-
-    const { data: invs } = await supabase
-      .from('project_invitations').select('*')
-      .eq('project_id', id).eq('activo', true)
-    setInvitaciones(invs || [])
 
     setLoading(false)
   }
@@ -82,33 +74,21 @@ export default function MiembrosPage() {
     setBuscando(false)
   }
 
-const agregarMiembro = async () => {
-  if (!usuarioEncontrado) return
-  setAgregando(true)
+  const agregarMiembro = async () => {
+    if (!usuarioEncontrado) return
+    setAgregando(true)
+    const { data, error } = await supabase
+      .from('project_members')
+      .insert({ project_id: proyectoId, user_id: usuarioEncontrado.id, rol: rolSeleccionado })
+      .select('*, profiles(nombre, email)').single()
 
-  const { data, error } = await supabase
-    .from('project_members')
-    .insert({ project_id: proyectoId, user_id: usuarioEncontrado.id, rol: rolSeleccionado })
-    .select('*, profiles(nombre, email)').single()
-
-  if (!error && data) {
-    setMiembros([...miembros, data])
-
-    // Enviar correo de notificación
-    await supabase.functions.invoke('enviar-invitacion', {
-      body: {
-        nombreInvitado: usuarioEncontrado.nombre,
-        emailInvitado: usuarioEncontrado.email,
-        nombreProyecto: proyecto?.nombre,
-        projectId: proyectoId
-      }
-    })
-
-    setUsuarioEncontrado(null)
-    setBusquedaEmail('')
+    if (!error && data) {
+      setMiembros([...miembros, data])
+      setUsuarioEncontrado(null)
+      setBusquedaEmail('')
+    }
+    setAgregando(false)
   }
-  setAgregando(false)
-}
 
   const cambiarRol = async (miembro, nuevoRol) => {
     setErrorRol('')
@@ -131,7 +111,6 @@ const agregarMiembro = async () => {
     setCambiandoRol(null)
   }
 
-  // Validar antes de mostrar el modal
   const solicitarEliminar = (miembro) => {
     setErrorRol('')
 
@@ -155,26 +134,6 @@ const agregarMiembro = async () => {
     setConfirmEliminar(null)
   }
 
-  const crearLinkInvitacion = async () => {
-  const { data } = await supabase
-    .from('project_invitations')
-    .insert({ project_id: proyectoId, rol: rolLink })
-    .select().single()
-  if (data) setInvitaciones([...invitaciones, data])
-  }
-
-  const copiarLink = async (token) => {
-    const link = `${window.location.origin}/unirse/${token}`
-    await navigator.clipboard.writeText(link)
-    setLinkCopiado(true)
-    setTimeout(() => setLinkCopiado(false), 2000)
-  }
-
-  const desactivarLink = async (id) => {
-    await supabase.from('project_invitations').update({ activo: false }).eq('id', id)
-    setInvitaciones(invitaciones.filter(i => i.id !== id))
-  }
-
   const rolColor = (rol) => {
     if (rol === 'director') return 'bg-purple-100 text-purple-700'
     if (rol === 'residente') return 'bg-blue-100 text-blue-700'
@@ -192,7 +151,7 @@ const agregarMiembro = async () => {
   return (
     <div className="min-h-screen bg-gray-50">
 
-      {/* Modal confirmación eliminar miembro */}
+      {/* Modal confirmación eliminar */}
       {confirmEliminar && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl p-6 w-full max-w-sm shadow-xl">
@@ -290,62 +249,6 @@ const agregarMiembro = async () => {
                     {agregando ? '...' : 'Agregar'}
                   </button>
                 </div>
-              </div>
-            )}
-          </div>
-        )}
-
-        {esDirector && (
-          <div className="bg-white rounded-xl p-5 shadow-sm">
-            <div className="flex items-center gap-2 mb-4">
-              <Link size={18} className="text-green-700" />
-              <h2 className="font-bold text-gray-800">Link de invitación</h2>
-            </div>
-            <p className="text-sm text-gray-500 mb-4">Genera un link para que clientes accedan en modo solo lectura sin necesidad de registro.</p>
-
-            {invitaciones.length === 0 ? (
-  <div className="space-y-3">
-    <div>
-      <label className="text-xs text-gray-500 mb-1 block">Rol del invitado</label>
-      <select
-        value={rolLink}
-        onChange={(e) => setRolLink(e.target.value)}
-        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-green-500"
-      >
-        <option value="cliente">Cliente (solo lectura)</option>
-        <option value="residente">Residente</option>
-        <option value="director">Director</option>
-      </select>
-    </div>
-    <button onClick={crearLinkInvitacion}
-      className="w-full border border-dashed border-gray-300 text-gray-600 py-3 rounded-xl hover:bg-gray-50 transition text-sm flex items-center justify-center gap-2">
-      <Link size={16} /> Generar link de invitación
-    </button>
-  </div>
-            ) : (
-              <div className="space-y-3">
-                {invitaciones.map((inv) => (
-                  <div key={inv.id} className="border border-gray-200 rounded-lg p-3 flex items-center justify-between gap-2">
-                    <p className="text-xs text-gray-500 truncate flex-1">
-                      {`${window.location.origin}/unirse/${inv.token}`}
-                    </p>
-                    <div className="flex gap-2 shrink-0">
-                      <button onClick={() => copiarLink(inv.token)}
-                        className="flex items-center gap-1 bg-green-700 text-white px-3 py-1.5 rounded-lg text-xs hover:bg-green-800 transition">
-                        {linkCopiado ? <Check size={13} /> : <Copy size={13} />}
-                        {linkCopiado ? 'Copiado' : 'Copiar'}
-                      </button>
-                      <button onClick={() => desactivarLink(inv.id)}
-                        className="text-red-400 hover:text-red-600 p-1.5 rounded-lg hover:bg-red-50 border border-red-200 transition">
-                        <Trash2 size={13} />
-                      </button>
-                    </div>
-                  </div>
-                ))}
-                <button onClick={crearLinkInvitacion}
-                  className="text-sm text-green-700 hover:underline">
-                  + Generar otro link
-                </button>
               </div>
             )}
           </div>
