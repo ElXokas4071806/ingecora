@@ -77,6 +77,7 @@ export default function MiembrosPage() {
   const agregarMiembro = async () => {
     if (!usuarioEncontrado) return
     setAgregando(true)
+
     const { data, error } = await supabase
       .from('project_members')
       .insert({ project_id: proyectoId, user_id: usuarioEncontrado.id, rol: rolSeleccionado })
@@ -84,6 +85,22 @@ export default function MiembrosPage() {
 
     if (!error && data) {
       setMiembros([...miembros, data])
+
+      // Enviar correo de notificación
+      try {
+        const { error: fnError } = await supabase.functions.invoke('enviar-invitacion', {
+          body: {
+            nombreInvitado: usuarioEncontrado.nombre,
+            emailInvitado: usuarioEncontrado.email,
+            nombreProyecto: proyecto?.nombre,
+            projectId: proyectoId
+          }
+        })
+        if (fnError) console.error('Error enviando correo:', fnError)
+      } catch (e) {
+        console.error('Error llamando Edge Function:', e)
+      }
+
       setUsuarioEncontrado(null)
       setBusquedaEmail('')
     }
@@ -151,7 +168,6 @@ export default function MiembrosPage() {
   return (
     <div className="min-h-screen bg-gray-50">
 
-      {/* Modal confirmación eliminar */}
       {confirmEliminar && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl p-6 w-full max-w-sm shadow-xl">
