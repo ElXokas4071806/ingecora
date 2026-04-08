@@ -12,7 +12,7 @@ export default function ProyectoPage() {
   const [mostrarSelector, setMostrarSelector] = useState(false)
   const [fechaSeleccionada, setFechaSeleccionada] = useState('')
   const [confirmBorrarBitacora, setConfirmBorrarBitacora] = useState(null)
-  const [rolUsuario, setRolUsuario] = useState(null) // 'owner' | 'director' | 'residente' | 'cliente'
+  const [rolUsuario, setRolUsuario] = useState(null)
   const router = useRouter()
   const pathname = usePathname()
   const supabase = createClient()
@@ -32,7 +32,6 @@ export default function ProyectoPage() {
       .from('projects').select('*').eq('id', id).single()
     setProyecto(proy)
 
-    // Determinar rol
     if (proy && prof && proy.org_id === prof.org_id) {
       setRolUsuario('owner')
     } else {
@@ -78,6 +77,7 @@ export default function ProyectoPage() {
 
   const puedeEditar = rolUsuario === 'owner' || rolUsuario === 'director' || rolUsuario === 'residente'
   const puedeGestionarMiembros = rolUsuario === 'owner' || rolUsuario === 'director'
+  const puedeVerMiembros = puedeGestionarMiembros || rolUsuario === 'residente'
   const esCliente = rolUsuario === 'cliente'
 
   if (loading) return (
@@ -128,7 +128,7 @@ export default function ProyectoPage() {
 
       <header className="bg-white shadow-[0_2px_4px_rgba(0,0,0,0.08)]">
         <div className="max-w-4xl mx-auto px-4 py-4 flex items-center gap-3">
-          <button onClick={() => router.push('/dashboard')} className="text-gray-500 hover:text-gray-800">
+          <button onClick={() => router.push('/dashboard')} className="text-gray-500 hover:text-gray-800 cursor-pointer">
             <ArrowLeft size={20} />
           </button>
           <div className="flex-1">
@@ -163,36 +163,39 @@ export default function ProyectoPage() {
           </div>
         </div>
 
-        {/* Botón crear bitácora — solo si puede editar */}
         {puedeEditar && (
           <button
             onClick={() => nuevaBitacora(hoy())}
-            className="w-full flex items-center justify-center gap-2 bg-green-700 text-white px-4 py-3 rounded-xl hover:bg-green-800 transition font-medium mb-3"
+            className="w-full flex items-center justify-center gap-2 bg-green-700 text-white px-4 py-3 rounded-xl hover:bg-green-800 transition font-medium mb-3 cursor-pointer"
           >
             <Plus size={20} /> Bitácora de hoy
           </button>
         )}
 
         {/* Botones secundarios */}
-        <div className={`grid gap-3 mb-6 ${puedeEditar ? (puedeGestionarMiembros ? 'grid-cols-3' : 'grid-cols-2') : 'grid-cols-2'}`}>
+        <div className={`grid gap-3 mb-6 ${
+          puedeEditar
+            ? (puedeVerMiembros ? 'grid-cols-3' : 'grid-cols-2')
+            : (puedeVerMiembros ? 'grid-cols-2' : 'grid-cols-1')
+        }`}>
           {puedeEditar && (
             <button
               onClick={() => setMostrarSelector(!mostrarSelector)}
-              className="flex items-center justify-center gap-2 border border-gray-300 text-gray-700 px-4 py-2.5 rounded-xl hover:bg-gray-50 transition text-sm"
+              className="flex items-center justify-center gap-2 border border-gray-300 text-gray-700 px-4 py-2.5 rounded-xl hover:bg-gray-100 transition text-sm cursor-pointer"
             >
               <Calendar size={16} /> Otra fecha
             </button>
           )}
           <button
             onClick={() => router.push(`/dashboard/proyectos/${proyectoId}/informe`)}
-            className="flex items-center justify-center gap-2 border border-gray-300 text-gray-700 px-4 py-2.5 rounded-xl hover:bg-gray-50 transition text-sm"
+            className="flex items-center justify-center gap-2 border border-gray-300 text-gray-700 px-4 py-2.5 rounded-xl hover:bg-gray-100 transition text-sm cursor-pointer"
           >
             <FileText size={16} /> Informe PDF
           </button>
-          {puedeGestionarMiembros && (
+          {puedeVerMiembros && (
             <button
               onClick={() => router.push(`/dashboard/proyectos/${proyectoId}/miembros`)}
-              className="flex items-center justify-center gap-2 border border-gray-300 text-gray-700 px-4 py-2.5 rounded-xl hover:bg-gray-50 transition text-sm"
+              className="flex items-center justify-center gap-2 border border-gray-300 text-gray-700 px-4 py-2.5 rounded-xl hover:bg-gray-100 transition text-sm cursor-pointer"
             >
               <Users size={16} /> Miembros
             </button>
@@ -218,7 +221,7 @@ export default function ProyectoPage() {
                   }
                 }}
                 disabled={!fechaSeleccionada}
-                className="bg-green-700 text-white px-4 py-2 rounded-lg hover:bg-green-800 transition text-sm disabled:opacity-50"
+                className="bg-green-700 text-white px-4 py-2 rounded-lg hover:bg-green-800 transition text-sm disabled:opacity-50 cursor-pointer"
               >
                 Ir
               </button>
@@ -254,11 +257,10 @@ export default function ProyectoPage() {
                     {estadoIcono(b.estado)}
                     <span className="capitalize hidden sm:block">{b.estado}</span>
                   </div>
-                  {/* Botón borrar solo si puede editar */}
                   {puedeEditar && (
                     <button
                       onClick={(e) => { e.stopPropagation(); setConfirmBorrarBitacora(b) }}
-                      className="text-red-400 hover:text-red-600 p-1.5 rounded-lg hover:bg-red-50 transition border border-red-200 hover:border-red-400"
+                      className="text-red-400 hover:text-red-600 p-1.5 rounded-lg hover:bg-red-50 transition border border-red-200 hover:border-red-400 cursor-pointer"
                     >
                       <Trash2 size={15} />
                     </button>
