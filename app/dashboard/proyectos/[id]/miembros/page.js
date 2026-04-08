@@ -82,21 +82,33 @@ export default function MiembrosPage() {
     setBuscando(false)
   }
 
-  const agregarMiembro = async () => {
-    if (!usuarioEncontrado) return
-    setAgregando(true)
-    const { data, error } = await supabase
-      .from('project_members')
-      .insert({ project_id: proyectoId, user_id: usuarioEncontrado.id, rol: rolSeleccionado })
-      .select('*, profiles(nombre, email)').single()
+const agregarMiembro = async () => {
+  if (!usuarioEncontrado) return
+  setAgregando(true)
 
-    if (!error && data) {
-      setMiembros([...miembros, data])
-      setUsuarioEncontrado(null)
-      setBusquedaEmail('')
-    }
-    setAgregando(false)
+  const { data, error } = await supabase
+    .from('project_members')
+    .insert({ project_id: proyectoId, user_id: usuarioEncontrado.id, rol: rolSeleccionado })
+    .select('*, profiles(nombre, email)').single()
+
+  if (!error && data) {
+    setMiembros([...miembros, data])
+
+    // Enviar correo de notificación
+    await supabase.functions.invoke('enviar-invitacion', {
+      body: {
+        nombreInvitado: usuarioEncontrado.nombre,
+        emailInvitado: usuarioEncontrado.email,
+        nombreProyecto: proyecto?.nombre,
+        projectId: proyectoId
+      }
+    })
+
+    setUsuarioEncontrado(null)
+    setBusquedaEmail('')
   }
+  setAgregando(false)
+}
 
   const cambiarRol = async (miembro, nuevoRol) => {
     setErrorRol('')
