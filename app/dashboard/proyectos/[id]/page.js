@@ -144,7 +144,7 @@ export default function ProyectoPage() {
       </header>
 
       <main className="max-w-4xl mx-auto px-4 py-6">
-        <div className="grid grid-cols-3 gap-3 mb-6">
+        <div className="grid grid-cols-2 gap-3 mb-6">
           <div className="bg-white rounded-xl p-3 shadow-sm text-center">
             <p className="text-2xl font-bold text-green-700">{bitacoras.length}</p>
             <p className="text-xs text-gray-500">Bitácoras</p>
