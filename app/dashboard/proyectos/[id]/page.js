@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react'
 import { createClient } from '../../../lib/supabase'
 import { useRouter, usePathname } from 'next/navigation'
-import { ArrowLeft, Plus, BookOpen, CheckCircle, Clock, Calendar, FileText, Trash2, AlertTriangle, Users, Eye } from 'lucide-react'
+import { ArrowLeft, Plus, BookOpen, CheckCircle, Clock, Calendar, FileText, Trash2, AlertTriangle, Users, BarChart2 } from 'lucide-react'
 
 export default function ProyectoPage() {
   const [proyecto, setProyecto] = useState(null)
@@ -12,7 +12,6 @@ export default function ProyectoPage() {
   const [mostrarSelector, setMostrarSelector] = useState(false)
   const [fechaSeleccionada, setFechaSeleccionada] = useState('')
   const [confirmBorrarBitacora, setConfirmBorrarBitacora] = useState(null)
-  const [rolUsuario, setRolUsuario] = useState(null)
   const router = useRouter()
   const pathname = usePathname()
   const supabase = createClient()
@@ -25,25 +24,9 @@ export default function ProyectoPage() {
   }, [pathname])
 
   const loadData = async (id) => {
-    const { data: { user } } = await supabase.auth.getUser()
-    const { data: prof } = await supabase.from('profiles').select('*').eq('id', user.id).single()
-
     const { data: proy } = await supabase
       .from('projects').select('*').eq('id', id).single()
     setProyecto(proy)
-
-    if (proy && prof && proy.org_id === prof.org_id) {
-      setRolUsuario('owner')
-    } else {
-      const { data: membresia } = await supabase
-        .from('project_members')
-        .select('rol')
-        .eq('project_id', id)
-        .eq('user_id', user.id)
-        .single()
-      setRolUsuario(membresia?.rol || 'cliente')
-    }
-
     const { data: logs } = await supabase
       .from('daily_logs').select('*').eq('project_id', id)
       .order('fecha', { ascending: false })
@@ -75,11 +58,6 @@ export default function ProyectoPage() {
     return <Clock size={14} />
   }
 
-  const puedeEditar = rolUsuario === 'owner' || rolUsuario === 'director' || rolUsuario === 'residente'
-  const puedeGestionarMiembros = rolUsuario === 'owner' || rolUsuario === 'director'
-  const puedeVerMiembros = puedeGestionarMiembros || rolUsuario === 'residente'
-  const esCliente = rolUsuario === 'cliente'
-
   if (loading) return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center">
       <p className="text-gray-500">Cargando...</p>
@@ -109,7 +87,7 @@ export default function ProyectoPage() {
             <div className="bg-red-50 border border-red-200 rounded-lg px-4 py-3 mb-5">
               <p className="text-red-700 text-sm font-medium flex items-center gap-2">
                 <AlertTriangle size={14} />
-                Esta acción es irreversible. Todos los datos, actividades y fotos se perderán.
+                Esta acción es irreversible. Todos los datos, actividades y fotos de esta bitácora se perderán para siempre.
               </p>
             </div>
             <div className="flex gap-3">
@@ -128,23 +106,18 @@ export default function ProyectoPage() {
 
       <header className="bg-white shadow-[0_2px_4px_rgba(0,0,0,0.08)]">
         <div className="max-w-4xl mx-auto px-4 py-4 flex items-center gap-3">
-          <button onClick={() => router.push('/dashboard')} className="text-gray-500 hover:text-gray-800 cursor-pointer">
+          <button onClick={() => router.push('/dashboard')} className="text-gray-500 hover:text-gray-800">
             <ArrowLeft size={20} />
           </button>
-          <div className="flex-1">
+          <div>
             <h1 className="text-xl font-bold text-gray-800">{proyecto?.nombre}</h1>
             {proyecto?.ubicacion && <p className="text-xs text-gray-500">📍 {proyecto.ubicacion}</p>}
           </div>
-          {esCliente && (
-            <span className="text-xs bg-gray-100 text-gray-500 px-2 py-1 rounded-full flex items-center gap-1">
-              <Eye size={11} /> Solo lectura
-            </span>
-          )}
         </div>
       </header>
 
       <main className="max-w-4xl mx-auto px-4 py-6">
-        <div className="grid grid-cols-2 gap-3 mb-6">
+        <div className="grid grid-cols-3 gap-3 mb-6">
           <div className="bg-white rounded-xl p-3 shadow-sm text-center">
             <p className="text-2xl font-bold text-green-700">{bitacoras.length}</p>
             <p className="text-xs text-gray-500">Bitácoras</p>
@@ -163,46 +136,44 @@ export default function ProyectoPage() {
           </div>
         </div>
 
-        {puedeEditar && (
-          <button
-            onClick={() => nuevaBitacora(hoy())}
-            className="w-full flex items-center justify-center gap-2 bg-green-700 text-white px-4 py-3 rounded-xl hover:bg-green-800 transition font-medium mb-3 cursor-pointer"
-          >
-            <Plus size={20} /> Bitácora de hoy
-          </button>
-        )}
+        <button
+          onClick={() => nuevaBitacora(hoy())}
+          className="w-full flex items-center justify-center gap-2 bg-green-700 text-white px-4 py-3 rounded-xl hover:bg-green-800 transition font-medium mb-3"
+        >
+          <Plus size={20} /> Bitácora de hoy
+        </button>
 
-        {/* Botones secundarios */}
-        <div className={`grid gap-3 mb-6 ${
-          puedeEditar
-            ? (puedeVerMiembros ? 'grid-cols-3' : 'grid-cols-2')
-            : (puedeVerMiembros ? 'grid-cols-2' : 'grid-cols-1')
-        }`}>
-          {puedeEditar && (
-            <button
-              onClick={() => setMostrarSelector(!mostrarSelector)}
-              className="flex items-center justify-center gap-2 border border-gray-300 text-gray-700 px-4 py-2.5 rounded-xl hover:bg-gray-100 transition text-sm cursor-pointer"
-            >
-              <Calendar size={16} /> Otra fecha
-            </button>
-          )}
+        <div className="grid grid-cols-2 gap-3 mb-3">
+          <button
+            onClick={() => setMostrarSelector(!mostrarSelector)}
+            className="flex items-center justify-center gap-2 border border-gray-300 text-gray-700 px-4 py-2.5 rounded-xl hover:bg-gray-50 transition text-sm"
+          >
+            <Calendar size={16} /> Otra fecha
+          </button>
           <button
             onClick={() => router.push(`/dashboard/proyectos/${proyectoId}/informe`)}
-            className="flex items-center justify-center gap-2 border border-gray-300 text-gray-700 px-4 py-2.5 rounded-xl hover:bg-gray-100 transition text-sm cursor-pointer"
+            className="flex items-center justify-center gap-2 border border-gray-300 text-gray-700 px-4 py-2.5 rounded-xl hover:bg-gray-50 transition text-sm"
           >
             <FileText size={16} /> Informe PDF
           </button>
-          {puedeVerMiembros && (
-            <button
-              onClick={() => router.push(`/dashboard/proyectos/${proyectoId}/miembros`)}
-              className="flex items-center justify-center gap-2 border border-gray-300 text-gray-700 px-4 py-2.5 rounded-xl hover:bg-gray-100 transition text-sm cursor-pointer"
-            >
-              <Users size={16} /> Miembros
-            </button>
-          )}
         </div>
 
-        {mostrarSelector && puedeEditar && (
+        <div className="grid grid-cols-2 gap-3 mb-6">
+          <button
+            onClick={() => router.push(`/dashboard/proyectos/${proyectoId}/miembros`)}
+            className="flex items-center justify-center gap-2 border border-gray-300 text-gray-700 px-4 py-2.5 rounded-xl hover:bg-gray-50 transition text-sm"
+          >
+            <Users size={16} /> Miembros
+          </button>
+          <button
+            onClick={() => router.push(`/dashboard/proyectos/${proyectoId}/gantt`)}
+            className="flex items-center justify-center gap-2 border border-gray-300 text-gray-700 px-4 py-2.5 rounded-xl hover:bg-gray-50 transition text-sm"
+          >
+            <BarChart2 size={16} /> Control avance
+          </button>
+        </div>
+
+        {mostrarSelector && (
           <div className="bg-white rounded-xl p-4 shadow-sm mb-4">
             <p className="text-sm font-medium text-gray-700 mb-3">Selecciona una fecha:</p>
             <div className="flex gap-3">
@@ -221,7 +192,7 @@ export default function ProyectoPage() {
                   }
                 }}
                 disabled={!fechaSeleccionada}
-                className="bg-green-700 text-white px-4 py-2 rounded-lg hover:bg-green-800 transition text-sm disabled:opacity-50 cursor-pointer"
+                className="bg-green-700 text-white px-4 py-2 rounded-lg hover:bg-green-800 transition text-sm disabled:opacity-50"
               >
                 Ir
               </button>
@@ -234,7 +205,7 @@ export default function ProyectoPage() {
           <div className="text-center py-16 text-gray-400">
             <BookOpen size={48} className="mx-auto mb-3 opacity-50" />
             <p className="text-lg">No hay bitácoras aún</p>
-            {puedeEditar && <p className="text-sm">Registra el avance de hoy</p>}
+            <p className="text-sm">Registra el avance de hoy</p>
           </div>
         ) : (
           <div className="space-y-3">
@@ -257,14 +228,12 @@ export default function ProyectoPage() {
                     {estadoIcono(b.estado)}
                     <span className="capitalize hidden sm:block">{b.estado}</span>
                   </div>
-                  {puedeEditar && (
-                    <button
-                      onClick={(e) => { e.stopPropagation(); setConfirmBorrarBitacora(b) }}
-                      className="text-red-400 hover:text-red-600 p-1.5 rounded-lg hover:bg-red-50 transition border border-red-200 hover:border-red-400 cursor-pointer"
-                    >
-                      <Trash2 size={15} />
-                    </button>
-                  )}
+                  <button
+                    onClick={(e) => { e.stopPropagation(); setConfirmBorrarBitacora(b) }}
+                    className="text-red-400 hover:text-red-600 p-1.5 rounded-lg hover:bg-red-50 transition border border-red-200 hover:border-red-400"
+                  >
+                    <Trash2 size={15} />
+                  </button>
                 </div>
               </div>
             ))}
